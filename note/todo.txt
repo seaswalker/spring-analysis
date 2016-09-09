@@ -1,1 +1,1 @@
-PropertySource继承体系
+http://forum.spring.io/forum/spring-projects/container/55647-resolving-placeholders-when-creating-an-application-context

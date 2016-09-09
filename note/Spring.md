@@ -174,6 +174,10 @@ public AbstractEnvironment() {
 StandardEnvironment.customizePropertySources:
 
 ```java
+/** System environment property source name: {@value} */
+public static final String SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME = "systemEnvironment";
+/** JVM system properties property source name: {@value} */
+public static final String SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME = "systemProperties";
 @Override
 protected void customizePropertySources(MutablePropertySources propertySources) {
 	propertySources.addLast(new MapPropertySource
@@ -187,7 +191,40 @@ protected void customizePropertySources(MutablePropertySources propertySources) 
 
 PropertySource接口代表了键值对的Property来源。继承体系：
 
+![PropertySource继承体系](images/PropertySource.jpg)
 
+AbstractEnvironment.getSystemProperties:
+
+```java
+@Override
+public Map<String, Object> getSystemProperties() {
+	try {
+		return (Map) System.getProperties();
+	}
+	catch (AccessControlException ex) {
+		return (Map) new ReadOnlySystemAttributesMap() {
+			@Override
+			protected String getSystemAttribute(String attributeName) {
+				try {
+					return System.getProperty(attributeName);
+				}
+				catch (AccessControlException ex) {
+					if (logger.isInfoEnabled()) {
+						logger.info(format("Caught AccessControlException when accessing system " +
+								"property [%s]; its value will be returned [null]. Reason: %s",
+								attributeName, ex.getMessage()));
+					}
+					return null;
+				}
+			}
+		};
+	}
+}
+```
+
+这里的实现很有意思，如果安全管理器阻止获取全部的系统属性，那么会尝试获取单个属性的可能性，如果还不行就抛异常了。
+
+getSystemEnvironment方法也是一个套路，不过最终调用的是System.getenv，可以获取jvm和OS的一些版本信息。
 
 #### 路径解析
 
@@ -208,7 +245,47 @@ private final ConfigurablePropertyResolver propertyResolver =
 			new PropertySourcesPropertyResolver(this.propertySources);
 ```
 
+##### PropertyResolver接口
+
 PropertyResolver继承体系(排除Environment分支):
 
 ![PropertyResolver继承体系](images/PropertyResolver.jpg)
+
+此接口正是用来解析PropertyResource。
+
+##### 解析
+
+AbstractPropertyResolver.resolveRequiredPlaceholders:
+
+```java
+@Override
+public String resolveRequiredPlaceholders(String text) throws IllegalArgumentException {
+	if (this.strictHelper == null) {
+		this.strictHelper = createPlaceholderHelper(false);
+	}
+	return doResolvePlaceholders(text, this.strictHelper);
+}
+```
+
+```java
+private PropertyPlaceholderHelper createPlaceholderHelper(boolean ignoreUnresolvablePlaceholders) {
+  	//三个参数分别是${, }, :
+	return new PropertyPlaceholderHelper(this.placeholderPrefix, this.placeholderSuffix,
+		this.valueSeparator, ignoreUnresolvablePlaceholders);
+}
+```
+
+doResolvePlaceholders：
+
+```java
+private String doResolvePlaceholders(String text, PropertyPlaceholderHelper helper) {
+  	//PlaceholderResolver接口依然是策略模式的体现
+	return helper.replacePlaceholders(text, new PropertyPlaceholderHelper.PlaceholderResolver() {
+		@Override
+		public String resolvePlaceholder(String placeholderName) {
+			return getPropertyAsRawString(placeholderName);
+		}
+	});
+}
+```
 

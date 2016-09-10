@@ -289,3 +289,329 @@ private String doResolvePlaceholders(String text, PropertyPlaceholderHelper help
 }
 ```
 
+其实代码执行到这里的时候还没有进行xml配置文件的解析，那么这里的解析placeHolder是什么意思呢，原因在于可以这么写:
+
+```java
+System.setProperty("spring", "classpath");
+ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("${spring}:config.xml");
+SimpleBean bean = context.getBean(SimpleBean.class);
+```
+
+这样就可以正确解析。placeholder的替换其实就是字符串操作，这里只说一下正确的属性是怎么来的。实现的关键在于PropertySourcesPropertyResolver.getProperty:
+
+```java
+@Override
+protected String getPropertyAsRawString(String key) {
+	return getProperty(key, String.class, false);
+}
+protected <T> T getProperty(String key, Class<T> targetValueType, boolean resolveNestedPlaceholders) {
+	if (this.propertySources != null) {
+		for (PropertySource<?> propertySource : this.propertySources) {
+			Object value = propertySource.getProperty(key);
+			return value;
+		}
+	}
+	return null;
+}
+```
+
+很明显了，就是从System.getProperty和System.getenv获取，但是由于环境变量是无法自定义的，所以其实此处只能通过System.setProperty指定。
+
+注意，classpath:XXX这种写法的classpath前缀到目前为止还没有被处理。
+
+## refresh
+
+Spring bean解析就在此方法，所以单独提出来。
+
+AbstractApplicationContext.refresh:
+
+```java
+@Override
+public void refresh() throws BeansException, IllegalStateException {
+	synchronized (this.startupShutdownMonitor) {
+		// Prepare this context for refreshing.
+		prepareRefresh();
+		// Tell the subclass to refresh the internal bean factory.
+		ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
+		// Prepare the bean factory for use in this context.
+		prepareBeanFactory(beanFactory);
+		try {
+			// Allows post-processing of the bean factory in context subclasses.
+			postProcessBeanFactory(beanFactory);
+			// Invoke factory processors registered as beans in the context.
+			invokeBeanFactoryPostProcessors(beanFactory);
+			// Register bean processors that intercept bean creation.
+			registerBeanPostProcessors(beanFactory);
+			// Initialize message source for this context.
+			initMessageSource();
+			// Initialize event multicaster for this context.
+			initApplicationEventMulticaster();
+			// Initialize other special beans in specific context subclasses.
+			onRefresh();
+			// Check for listener beans and register them.
+			registerListeners();
+			// Instantiate all remaining (non-lazy-init) singletons.
+			finishBeanFactoryInitialization(beanFactory);
+			// Last step: publish corresponding event.
+			finishRefresh();
+		} catch (BeansException ex) {
+			// Destroy already created singletons to avoid dangling resources.
+			destroyBeans();
+			// Reset 'active' flag.
+			cancelRefresh(ex);
+			// Propagate exception to caller.
+			throw ex;
+		} finally {
+			// Reset common introspection caches in Spring's core, since we
+			// might not ever need metadata for singleton beans anymore...
+			resetCommonCaches();
+		}
+	}
+}
+```
+
+### prepareRefresh
+
+```java
+protected void prepareRefresh() {
+	this.startupDate = System.currentTimeMillis();
+	this.closed.set(false);
+	this.active.set(true);
+	// Initialize any placeholder property sources in the context environment
+  	//空实现
+	initPropertySources();
+	// Validate that all properties marked as required are resolvable
+	// see ConfigurablePropertyResolver#setRequiredProperties
+	getEnvironment().validateRequiredProperties();
+	// Allow for the collection of early ApplicationEvents,
+	// to be published once the multicaster is available...
+	this.earlyApplicationEvents = new LinkedHashSet<ApplicationEvent>();
+}
+```
+
+#### 属性校验
+
+AbstractEnvironment.validateRequiredProperties:
+
+```java
+@Override
+public void validateRequiredProperties() throws MissingRequiredPropertiesException {
+	this.propertyResolver.validateRequiredProperties();
+}
+```
+
+AbstractPropertyResolver.validateRequiredProperties:
+
+```java
+@Override
+public void validateRequiredProperties() {
+	MissingRequiredPropertiesException ex = new MissingRequiredPropertiesException();
+	for (String key : this.requiredProperties) {
+		if (this.getProperty(key) == null) {
+			ex.addMissingRequiredProperty(key);
+		}
+	}
+	if (!ex.getMissingRequiredProperties().isEmpty()) {
+		throw ex;
+	}
+}
+```
+
+requiredProperties是通过setRequiredProperties方法设置的，保存在一个list里面，默认是空的，也就是不需要校验任何属性。
+
+### BeanFactory创建
+
+AbstractRefreshableApplicationContext.refreshBeanFactory:
+
+```java
+@Override
+protected final void refreshBeanFactory() throws BeansException {
+  	//如果已经存在，那么销毁之前的
+	if (hasBeanFactory()) {
+		destroyBeans();
+		closeBeanFactory();
+	}
+    //创建了一个DefaultListableBeanFactory对象
+    DefaultListableBeanFactory beanFactory = createBeanFactory();
+    beanFactory.setSerializationId(getId());
+    customizeBeanFactory(beanFactory);
+    loadBeanDefinitions(beanFactory);
+    synchronized (this.beanFactoryMonitor) {
+    	this.beanFactory = beanFactory;
+    }
+}
+```
+
+#### BeanFactory接口
+
+此接口实际上就是Bean容器，其继承体系:
+
+![BeanFactory继承体系](images/BeanFactory.jpg)
+
+#### BeanFactory定制
+
+AbstractRefreshableApplicationContext.customizeBeanFactory方法用于给子类提供一个自由配置的机会，默认实现:
+
+```java
+protected void customizeBeanFactory(DefaultListableBeanFactory beanFactory) {
+	if (this.allowBeanDefinitionOverriding != null) {
+      	//默认false，不允许覆盖
+		beanFactory.setAllowBeanDefinitionOverriding(this.allowBeanDefinitionOverriding);
+	}
+	if (this.allowCircularReferences != null) {
+      	//默认false，不允许循环引用
+		beanFactory.setAllowCircularReferences(this.allowCircularReferences);
+	}
+}
+```
+
+#### Bean加载
+
+AbstractXmlApplicationContext.loadBeanDefinitions，这个便是核心的bean加载了:
+
+```java
+@Override
+protected void loadBeanDefinitions(DefaultListableBeanFactory beanFactory) {
+	// Create a new XmlBeanDefinitionReader for the given BeanFactory.
+	XmlBeanDefinitionReader beanDefinitionReader = new XmlBeanDefinitionReader(beanFactory);
+	// Configure the bean definition reader with this context's
+	// resource loading environment.
+	beanDefinitionReader.setEnvironment(this.getEnvironment());
+	beanDefinitionReader.setResourceLoader(this);
+	beanDefinitionReader.setEntityResolver(new ResourceEntityResolver(this));
+	// Allow a subclass to provide custom initialization of the reader,
+	// then proceed with actually loading the bean definitions.
+  	//默认空实现
+	initBeanDefinitionReader(beanDefinitionReader);
+	loadBeanDefinitions(beanDefinitionReader);
+}
+```
+
+##### EntityResolver
+
+此处只说明用到的部分继承体系:
+
+![EntityResolver继承体系](images/EntityResolver.jpg)
+
+EntityResolver接口在org.xml.sax中定义。DelegatingEntityResolver用于schema和dtd的解析。
+
+##### BeanDefinitionReader
+
+继承体系:
+
+![BeanDefinitionReader继承体系](images/BeanDefinitionReader.jpg)
+
+
+
+##### 加载
+
+```java
+protected void loadBeanDefinitions(XmlBeanDefinitionReader reader) {
+	Resource[] configResources = getConfigResources();
+	if (configResources != null) {
+		reader.loadBeanDefinitions(configResources);
+	}
+	String[] configLocations = getConfigLocations();
+  	//here
+	if (configLocations != null) {
+		reader.loadBeanDefinitions(configLocations);
+	}
+}
+```
+
+AbstractBeanDefinitionReader.loadBeanDefinitions:
+
+```java
+@Override
+public int loadBeanDefinitions(String... locations) throws BeanDefinitionStoreException {
+	Assert.notNull(locations, "Location array must not be null");
+	int counter = 0;
+	for (String location : locations) {
+		counter += loadBeanDefinitions(location);
+	}
+	return counter;
+}
+```
+
+之后调用:
+
+```java
+//第二个参数为空
+public int loadBeanDefinitions(String location, Set<Resource> actualResources) {
+	ResourceLoader resourceLoader = getResourceLoader();
+  	//参见ResourceLoader类图，ClassPathXmlApplicationContext实现了此接口
+	if (resourceLoader instanceof ResourcePatternResolver) {
+		// Resource pattern matching available.
+		try {
+			Resource[] resources = ((ResourcePatternResolver) resourceLoader).getResources(location);
+			int loadCount = loadBeanDefinitions(resources);
+			if (actualResources != null) {
+				for (Resource resource : resources) {
+					actualResources.add(resource);
+				}
+			}
+			return loadCount;
+		}
+		catch (IOException ex) {
+			throw new BeanDefinitionStoreException(
+					"Could not resolve bean definition resource pattern [" + location + "]", ex);
+		}
+	}
+	else {
+		// Can only load single resources by absolute URL.
+		Resource resource = resourceLoader.getResource(location);
+		int loadCount = loadBeanDefinitions(resource);
+		if (actualResources != null) {
+			actualResources.add(resource);
+		}
+		return loadCount;
+	}
+}
+```
+
+getResource的实现在AbstractApplicationContext：
+
+```java
+@Override
+public Resource[] getResources(String locationPattern) throws IOException {
+  	//构造器中初始化，PathMatchingResourcePatternResolver对象
+	return this.resourcePatternResolver.getResources(locationPattern);
+}
+```
+
+PathMatchingResourcePatternResolver是ResourceLoader继承体系的一部分。
+
+```java
+@Override
+public Resource[] getResources(String locationPattern) throws IOException {
+	Assert.notNull(locationPattern, "Location pattern must not be null");
+  	//classpath:
+	if (locationPattern.startsWith(CLASSPATH_ALL_URL_PREFIX)) {
+		// a class path resource (multiple resources for same name possible)
+		if (getPathMatcher().isPattern(locationPattern
+			.substring(CLASSPATH_ALL_URL_PREFIX.length()))) {
+			// a class path resource pattern
+			return findPathMatchingResources(locationPattern);
+		} else {
+			// all class path resources with the given name
+			return findAllClassPathResources(locationPattern
+				.substring(CLASSPATH_ALL_URL_PREFIX.length()));
+		}
+	} else {
+		// Only look for a pattern after a prefix here
+		// (to not get fooled by a pattern symbol in a strange prefix).
+		int prefixEnd = locationPattern.indexOf(":") + 1;
+		if (getPathMatcher().isPattern(locationPattern.substring(prefixEnd))) {
+			// a file pattern
+			return findPathMatchingResources(locationPattern);
+		}
+		else {
+			// a single resource with the given name
+			return new Resource[] {getResourceLoader().getResource(locationPattern)};
+		}
+	}
+}
+```
+
+
+

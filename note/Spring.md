@@ -226,7 +226,7 @@ public Map<String, Object> getSystemProperties() {
 
 getSystemEnvironment方法也是一个套路，不过最终调用的是System.getenv，可以获取jvm和OS的一些版本信息。
 
-#### 路径解析
+#### 路径Placeholder处理
 
 AbstractEnvironment.resolveRequiredPlaceholders:
 
@@ -503,7 +503,7 @@ EntityResolver接口在org.xml.sax中定义。DelegatingEntityResolver用于sche
 
 
 
-##### 加载
+##### 路径解析(Ant)
 
 ```java
 protected void loadBeanDefinitions(XmlBeanDefinitionReader reader) {
@@ -588,6 +588,7 @@ public Resource[] getResources(String locationPattern) throws IOException {
   	//classpath:
 	if (locationPattern.startsWith(CLASSPATH_ALL_URL_PREFIX)) {
 		// a class path resource (multiple resources for same name possible)
+      	//matcher是一个AntPathMatcher对象
 		if (getPathMatcher().isPattern(locationPattern
 			.substring(CLASSPATH_ALL_URL_PREFIX.length()))) {
 			// a class path resource pattern
@@ -611,6 +612,182 @@ public Resource[] getResources(String locationPattern) throws IOException {
 		}
 	}
 }
+```
+
+isPattern:
+
+```java
+@Override
+public boolean isPattern(String path) {
+	return (path.indexOf('*') != -1 || path.indexOf('?') != -1);
+}
+```
+
+可以看出配置文件路径是支持ant风格的，也就是可以这么写:
+
+```java
+new ClassPathXmlApplicationContext("con*.xml");
+```
+
+具体怎么解析ant风格的就不写了。
+
+##### 配置文件加载
+
+入口方法在AbstractBeanDefinitionReader的217行:
+
+```java
+//加载
+Resource[] resources = ((ResourcePatternResolver) resourceLoader).getResources(location);
+//解析
+int loadCount = loadBeanDefinitions(resources);
+```
+
+最终逐个调用XmlBeanDefinitionReader的loadBeanDefinitions方法:
+
+```java
+@Override
+public int loadBeanDefinitions(Resource resource) {
+	return loadBeanDefinitions(new EncodedResource(resource));
+}
+```
+
+Resource是代表一种资源的接口，其类图:
+
+![Resource类图](images/Resource.jpg)
+
+EncodedResource扮演的其实是一个装饰器的模式，为InputStreamSource添加了字符编码(虽然默认为null)。这样为我们自定义xml配置文件的编码方式提供了机会。
+
+之后关键的源码只有两行:
+
+```java
+public int loadBeanDefinitions(EncodedResource encodedResource) throws BeanDefinitionStoreException {
+	InputStream inputStream = encodedResource.getResource().getInputStream();
+  	InputSource inputSource = new InputSource(inputStream);
+	return doLoadBeanDefinitions(inputSource, encodedResource.getResource());
+}
+```
+
+InputSource是org.xml.sax的类。
+
+doLoadBeanDefinitions：
+
+```java
+protected int doLoadBeanDefinitions(InputSource inputSource, Resource resource) {
+	Document doc = doLoadDocument(inputSource, resource);
+	return registerBeanDefinitions(doc, resource);
+}
+```
+
+doLoadDocument:
+
+```java
+protected Document doLoadDocument(InputSource inputSource, Resource resource) {
+	return this.documentLoader.loadDocument(inputSource, getEntityResolver(), this.errorHandler,
+		getValidationModeForResource(resource), isNamespaceAware());
+}
+```
+
+documentLoader是一个DefaultDocumentLoader对象，此类是DocumentLoader接口的唯一实现。getEntityResolver方法返回ResourceEntityResolver，上面说过了。errorHandler是一个SimpleSaxErrorHandler对象。
+
+校验模型其实就是确定xml文件使用xsd方式还是dtd方式来校验，忘了的话左转度娘。Spring会通过读取xml文件的方式判断应该采用哪种。
+
+NamespaceAware默认false，因为默认配置了校验为true。
+
+DefaultDocumentLoader.loadDocument:
+
+```java
+@Override
+public Document loadDocument(InputSource inputSource, EntityResolver entityResolver,
+	ErrorHandler errorHandler, int validationMode, boolean namespaceAware) {
+  	//这里就是老套路了，可以看出，Spring还是使用了dom的方式解析，即一次全部load到内存
+	DocumentBuilderFactory factory = createDocumentBuilderFactory(validationMode, namespaceAware);
+	DocumentBuilder builder = createDocumentBuilder(factory, entityResolver, errorHandler);
+	return builder.parse(inputSource);
+}
+```
+
+createDocumentBuilderFactory比较有意思:
+
+```java
+protected DocumentBuilderFactory createDocumentBuilderFactory(int validationMode, boolean namespaceAware{
+	DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+	factory.setNamespaceAware(namespaceAware);
+	if (validationMode != XmlValidationModeDetector.VALIDATION_NONE) {
+      	//此方法设为true仅对dtd有效，xsd(schema)无效
+		factory.setValidating(true);
+		if (validationMode == XmlValidationModeDetector.VALIDATION_XSD) {
+			// Enforce namespace aware for XSD...
+          	 //开启xsd(schema)支持
+			factory.setNamespaceAware(true);
+          	 //这个也是Java支持Schema的套路，可以问度娘
+			factory.setAttribute(SCHEMA_LANGUAGE_ATTRIBUTE, XSD_SCHEMA_LANGUAGE);
+		}
+	}
+	return factory;
+}
+```
+
+##### Bean解析
+
+XmlBeanDefinitionReader.registerBeanDefinitions:
+
+```java
+public int registerBeanDefinitions(Document doc, Resource resource) {
+	BeanDefinitionDocumentReader documentReader = createBeanDefinitionDocumentReader();
+	int countBefore = getRegistry().getBeanDefinitionCount();
+	documentReader.registerBeanDefinitions(doc, createReaderContext(resource));
+	return getRegistry().getBeanDefinitionCount() - countBefore;
+}
+```
+
+createBeanDefinitionDocumentReader:
+
+```java
+protected BeanDefinitionDocumentReader createBeanDefinitionDocumentReader() {
+	return BeanDefinitionDocumentReader.class.cast
+      //反射
+      (BeanUtils.instantiateClass(this.documentReaderClass));
+}
+```
+
+documentReaderClass默认是DefaultBeanDefinitionDocumentReader，这其实也是策略模式，通过setter方法可以更换其实现。
+
+注意cast方法，代替了强转。
+
+createReaderContext：
+
+```java
+public XmlReaderContext createReaderContext(Resource resource) {
+	return new XmlReaderContext(resource, this.problemReporter, this.eventListener,
+		this.sourceExtractor, this, getNamespaceHandlerResolver());
+}
+```
+
+problemReporter是一个FailFastProblemReporter对象。
+
+eventListener是EmptyReaderEventListener对象，此类里的方法都是空实现。
+
+sourceExtractor是NullSourceExtractor对象，直接返回空，也是空实现。
+
+getNamespaceHandlerResolver默认返回DefaultNamespaceHandlerResolver对象，用来获取xsd对应的处理器。
+
+XmlReaderContext的作用感觉就是这一堆参数的容器，糅合到一起传给DocumentReader，并美其名为Context。可以看出，Spring中到处都是策略模式，大量操作被抽象成接口。
+
+DefaultBeanDefinitionDocumentReader.registerBeanDefinitions:
+
+```java
+@Override
+public void registerBeanDefinitions(Document doc, XmlReaderContext readerContext) {
+	this.readerContext = readerContext;
+	Element root = doc.getDocumentElement();
+	doRegisterBeanDefinitions(root);
+}
+```
+
+doRegisterBeanDefinitions:
+
+```java
+
 ```
 
 

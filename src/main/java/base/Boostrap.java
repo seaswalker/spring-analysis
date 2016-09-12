@@ -5,9 +5,8 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
 public class Boostrap {
 
 	public static void main(String[] args) {
-		System.setProperty("spring", "classpath");
-		ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("${spring}:config.xml");
-		SimpleBean bean = context.getBean(SimpleBean.class);
+		ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("config.xml");
+		SimpleBean bean = SimpleBean.class.cast(context.getBean("b"));
 		bean.send();
 		context.close();
 	}

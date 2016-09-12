@@ -13,6 +13,5 @@
         http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-4.0.xsd  
         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd">    
 
-  	<bean class="base.SimpleBean"></bean>
-  
+  	<bean id="b" name="one, two" class="base.SimpleBean"></bean>
 </beans>

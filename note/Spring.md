@@ -787,8 +787,246 @@ public void registerBeanDefinitions(Document doc, XmlReaderContext readerContext
 doRegisterBeanDefinitions:
 
 ```java
-
+protected void doRegisterBeanDefinitions(Element root) {
+	BeanDefinitionParserDelegate parent = this.delegate;
+	this.delegate = createDelegate(getReaderContext(), root, parent);
+  	//默认的命名空间即
+  	//http://www.springframework.org/schema/beans
+	if (this.delegate.isDefaultNamespace(root)) {
+      	//检查profile属性
+		String profileSpec = root.getAttribute(PROFILE_ATTRIBUTE);
+		if (StringUtils.hasText(profileSpec)) {
+          	//profile属性可以以,分割
+			String[] specifiedProfiles = StringUtils.tokenizeToStringArray(
+					profileSpec, BeanDefinitionParserDelegate.MULTI_VALUE_ATTRIBUTE_DELIMITERS);
+			if (!getReaderContext().getEnvironment().acceptsProfiles(specifiedProfiles)) {
+				return;
+			}
+		}
+	}
+	preProcessXml(root);
+	parseBeanDefinitions(root, this.delegate);
+	postProcessXml(root);
+	this.delegate = parent;
+}
 ```
 
+delegate的作用在于处理beans标签的嵌套，其实Spring配置文件是可以写成这样的:
 
+```xml
+<?xml version="1.0" encoding="UTF-8"?>    
+<beans>    
+  	<bean class="base.SimpleBean"></bean>
+  	<beans>
+  		<bean class="java.lang.Object"></bean>
+  	</beans>
+</beans>
+```
+
+xml(schema)的命名空间其实类似于java的报名，命名空间采用URL，比如Spring的是这样:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>    
+<beans xmlns="http://www.springframework.org/schema/beans"></beans>
+```
+
+xmlns属性就是xml规范定义的用来设置命名空间的。这样设置了之后其实里面的bean元素全名就相当于http://www.springframework.org/schema/beans:bean，可以有效的防止命名冲突。命名空间可以通过规范定义的org.w3c.dom.Node.getNamespaceURI方法获得。
+
+注意一下profile的检查, AbstractEnvironment.acceptsProfiles:
+
+```java
+@Override
+public boolean acceptsProfiles(String... profiles) {
+	Assert.notEmpty(profiles, "Must specify at least one profile");
+	for (String profile : profiles) {
+		if (StringUtils.hasLength(profile) && profile.charAt(0) == '!') {
+			if (!isProfileActive(profile.substring(1))) {
+				return true;
+			}
+		} else if (isProfileActive(profile)) {
+			return true;
+		}
+	}
+	return false;
+}
+```
+
+原理很简单，注意从源码可以看出，**profile属性支持!取反**。
+
+preProcessXml方法是个空实现，供子类去覆盖，**目的在于给子类一个把我们自定义的标签转为Spring标准标签的机会**, 想的真周到。
+
+parseBeanDefinitions：
+
+```java
+protected void parseBeanDefinitions(Element root, BeanDefinitionParserDelegate delegate) {
+	if (delegate.isDefaultNamespace(root)) {
+		NodeList nl = root.getChildNodes();
+		for (int i = 0; i < nl.getLength(); i++) {
+			Node node = nl.item(i);
+			if (node instanceof Element) {
+				Element ele = (Element) node;
+				if (delegate.isDefaultNamespace(ele)) {
+					parseDefaultElement(ele, delegate);
+				} else {
+					delegate.parseCustomElement(ele);
+				}
+			}
+		}
+	} else {
+		delegate.parseCustomElement(root);
+	}
+}
+```
+
+可见，对于非默认命名空间的元素交由delegate处理。
+
+###### 默认命名空间元素处理
+
+即import, alias, bean, 嵌套的beans四种元素。parseDefaultElement:
+
+```java
+private void parseDefaultElement(Element ele, BeanDefinitionParserDelegate delegate) {
+  	//"import"
+	if (delegate.nodeNameEquals(ele, IMPORT_ELEMENT)) {
+		importBeanDefinitionResource(ele);
+	}
+	else if (delegate.nodeNameEquals(ele, ALIAS_ELEMENT)) {
+		processAliasRegistration(ele);
+	}
+	else if (delegate.nodeNameEquals(ele, BEAN_ELEMENT)) {
+		processBeanDefinition(ele, delegate);
+	}
+	else if (delegate.nodeNameEquals(ele, NESTED_BEANS_ELEMENT)) {
+		// recurse
+		doRegisterBeanDefinitions(ele);
+	}
+}
+```
+
+- import
+
+  写法示例:
+
+  ```xml
+  <import resource="CTIContext.xml" />
+  <import resource="customerContext.xml" />
+  ```
+
+  importBeanDefinitionResource套路和之前的配置文件加载完全一样，不过注意被import进来的文件是先于当前文件 被解析的。
+
+- alias
+
+  加入有一个bean名为componentA-dataSource，但是另一个组件想以componentB-dataSource的名字使用，就可以这样定义:
+
+  ```xml
+  <alias name="componentA-dataSource" alias="componentB-dataSource"/>
+  ```
+
+  processAliasRegistration核心源码:
+
+  ```java
+  protected void processAliasRegistration(Element ele) {
+  	String name = ele.getAttribute(NAME_ATTRIBUTE);
+  	String alias = ele.getAttribute(ALIAS_ATTRIBUTE);
+  	getReaderContext().getRegistry().registerAlias(name, alias);
+  	getReaderContext().fireAliasRegistered(name, alias, extractSource(ele));
+  }
+  ```
+
+  从前面的源码可以发现，registry其实就是DefaultListableBeanFactory，它实现了BeanDefinitionRegistry接口。registerAlias方法的实现在SimpleAliasRegistry:
+
+  ```java
+  @Override
+  public void registerAlias(String name, String alias) {
+  	Assert.hasText(name, "'name' must not be empty");
+  	Assert.hasText(alias, "'alias' must not be empty");
+    	//名字和别名一样
+  	if (alias.equals(name)) {
+        	//ConcurrentHashMap
+  		this.aliasMap.remove(alias);
+  	} else {
+  		String registeredName = this.aliasMap.get(alias);
+  		if (registeredName != null) {
+  			if (registeredName.equals(name)) {
+  				// An existing alias - no need to re-register
+  				return;
+  			}
+  			if (!allowAliasOverriding()) {
+  				throw new IllegalStateException
+  					("Cannot register alias '" + alias + "' for name '" +
+  					name + "': It is already registered for name '" + registeredName + "'.");
+  			}
+  		}
+  		checkForAliasCircle(name, alias);
+  		this.aliasMap.put(alias, name);
+  	}
+  }
+  ```
+
+  所以别名关系的保存使用Map完成，key为别名，value为本来的名字。
+
+- bean
+
+  bean节点是Spring最最常见的节点了。
+
+  DefaultBeanDefinitionDocumentReader.processBeanDefinition:
+
+  ```java
+  protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {
+  	BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
+  	if (bdHolder != null) {
+  		bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
+  		try {
+  			// Register the final decorated instance.
+  			BeanDefinitionReaderUtils.registerBeanDefinition
+  				(bdHolder, getReaderContext().getRegistry());
+  		}
+  		catch (BeanDefinitionStoreException ex) {
+  			getReaderContext().error("Failed to register bean definition with name '" +
+  					bdHolder.getBeanName() + "'", ele, ex);
+  		}
+  		// Send registration event.
+  		getReaderContext().fireComponentRegistered(new BeanComponentDefinition(bdHolder));
+  	}
+  }
+  ```
+
+  解析:
+
+  id & name处理:
+
+  最终调用BeanDefinitionParserDelegate.parseBeanDefinitionElement(Element ele, BeanDefinition containingBean)，源码较长，分部分说明。
+
+  首先获取到id和name属性，**name属性支持配置多个，以逗号分隔，如果没有指定id，那么将以第一个name属性值代替。id必须是唯一的，name属性其实是alias的角色，可以和其它的bean重复，如果name也没有配置，那么其实什么也没做**。
+
+  ```java
+  String id = ele.getAttribute(ID_ATTRIBUTE);
+  String nameAttr = ele.getAttribute(NAME_ATTRIBUTE);
+  List<String> aliases = new ArrayList<String>();
+  if (StringUtils.hasLength(nameAttr)) {
+    	//按,分隔
+  	String[] nameArr = StringUtils.tokenizeToStringArray
+  		(nameAttr, MULTI_VALUE_ATTRIBUTE_DELIMITERS);
+  	aliases.addAll(Arrays.asList(nameArr));
+  }
+  String beanName = id;
+  if (!StringUtils.hasText(beanName) && !aliases.isEmpty()) {
+    	//name的第一个值作为id
+  	beanName = aliases.remove(0);
+  }
+  //默认null
+  if (containingBean == null) {
+    	//校验id是否已重复，如果重复直接抛异常
+    	//校验是通过内部一个HashSet完成的，出现过的id都会保存进此Set
+  	checkNameUniqueness(beanName, aliases, ele);
+  }
+  ```
+
+  bean解析:
+
+  ​
+
+  ​
+
+  ​
 

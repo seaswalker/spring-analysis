@@ -1024,6 +1024,57 @@ private void parseDefaultElement(Element ele, BeanDefinitionParserDelegate deleg
 
   bean解析:
 
+  还是分部分说明(parseBeanDefinitionElement)。
+
+  首先获取到bean的class属性和parent属性，配置了parent之后，当前bean会继承父bean的属性。之后根据class和parent创建BeanDefinition对象。
+
+  ```java
+  String className = null;
+  if (ele.hasAttribute(CLASS_ATTRIBUTE)) {
+  	className = ele.getAttribute(CLASS_ATTRIBUTE).trim();
+  }
+  String parent = null;
+  if (ele.hasAttribute(PARENT_ATTRIBUTE)) {
+  	parent = ele.getAttribute(PARENT_ATTRIBUTE);
+  }
+  AbstractBeanDefinition bd = createBeanDefinition(className, parent);
+  ```
+
+  BeanDefinition的创建在BeanDefinitionReaderUtils.createBeanDefinition:
+
+  ```java
+  public static AbstractBeanDefinition createBeanDefinition(
+  		String parentName, String className, ClassLoader classLoader) {
+  	GenericBeanDefinition bd = new GenericBeanDefinition();
+  	bd.setParentName(parentName);
+  	if (className != null) {
+  		if (classLoader != null) {
+  			bd.setBeanClass(ClassUtils.forName(className, classLoader));
+  		}
+  		else {
+  			bd.setBeanClassName(className);
+  		}
+  	}
+  	return bd;
+  }
+  ```
+
+  之后是解析bean的其它属性，其实就是读取其配置，调用相应的setter方法保存在BeanDefinition中:
+
+  ```java
+  parseBeanDefinitionAttributes(ele, beanName, containingBean, bd);
+  ```
+
+  之后解析bean的decription子元素:
+
+  ```xml
+  <bean id="b" name="one, two" class="base.SimpleBean">
+  	<description>SimpleBean</description>
+  </bean>
+  ```
+
+  就仅仅 是个描述。
+
   ​
 
   ​

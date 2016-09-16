@@ -1,1 +1,1 @@
-http://forum.spring.io/forum/spring-projects/container/55647-resolving-placeholders-when-creating-an-application-context
+http://blog.csdn.net/zhoudaxia/article/details/36247883

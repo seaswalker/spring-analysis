@@ -14,12 +14,12 @@
         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd">    
 
 	<context:annotation-config />
-	
 
 	<bean class="base.Student" primary="true">
 		<property name="name" value="skywalker"></property>
 		<property name="age" value="12"></property>
   		<qualifier type="org.springframework.beans.factory.annotation.Qualifier" value="student" />
+		<context:property-override />
 	</bean>
 	
 	<bean class="base.Student">

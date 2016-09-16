@@ -421,7 +421,7 @@ requiredProperties是通过setRequiredProperties方法设置的，保存在一�
 
 ### BeanFactory创建
 
-AbstractRefreshableApplicationContext.refreshBeanFactory:
+由obtainFreshBeanFactory调用AbstractRefreshableApplicationContext.refreshBeanFactory:
 
 ```java
 @Override
@@ -880,7 +880,7 @@ protected void parseBeanDefinitions(Element root, BeanDefinitionParserDelegate d
 
 可见，对于非默认命名空间的元素交由delegate处理。
 
-###### 默认命名空间元素处理
+#### 默认命名空间解析
 
 即import, alias, bean, 嵌套的beans四种元素。parseDefaultElement:
 
@@ -903,311 +903,495 @@ private void parseDefaultElement(Element ele, BeanDefinitionParserDelegate deleg
 }
 ```
 
-- import
-
-  写法示例:
-
-  ```xml
-  <import resource="CTIContext.xml" />
-  <import resource="customerContext.xml" />
-  ```
-
-  importBeanDefinitionResource套路和之前的配置文件加载完全一样，不过注意被import进来的文件是先于当前文件 被解析的。
-
-- alias
-
-  加入有一个bean名为componentA-dataSource，但是另一个组件想以componentB-dataSource的名字使用，就可以这样定义:
-
-  ```xml
-  <alias name="componentA-dataSource" alias="componentB-dataSource"/>
-  ```
-
-  processAliasRegistration核心源码:
-
-  ```java
-  protected void processAliasRegistration(Element ele) {
-  	String name = ele.getAttribute(NAME_ATTRIBUTE);
-  	String alias = ele.getAttribute(ALIAS_ATTRIBUTE);
-  	getReaderContext().getRegistry().registerAlias(name, alias);
-  	getReaderContext().fireAliasRegistered(name, alias, extractSource(ele));
-  }
-  ```
-
-  从前面的源码可以发现，registry其实就是DefaultListableBeanFactory，它实现了BeanDefinitionRegistry接口。registerAlias方法的实现在SimpleAliasRegistry:
-
-  ```java
-  @Override
-  public void registerAlias(String name, String alias) {
-  	Assert.hasText(name, "'name' must not be empty");
-  	Assert.hasText(alias, "'alias' must not be empty");
-    	//名字和别名一样
-  	if (alias.equals(name)) {
-        	//ConcurrentHashMap
-  		this.aliasMap.remove(alias);
-  	} else {
-  		String registeredName = this.aliasMap.get(alias);
-  		if (registeredName != null) {
-  			if (registeredName.equals(name)) {
-  				// An existing alias - no need to re-register
-  				return;
-  			}
-  			if (!allowAliasOverriding()) {
-  				throw new IllegalStateException
-  					("Cannot register alias '" + alias + "' for name '" +
-  					name + "': It is already registered for name '" + registeredName + "'.");
-  			}
-  		}
-  		checkForAliasCircle(name, alias);
-  		this.aliasMap.put(alias, name);
-  	}
-  }
-  ```
-
-  所以别名关系的保存使用Map完成，key为别名，value为本来的名字。
-
-- bean
-
-  bean节点是Spring最最常见的节点了。
-
-  DefaultBeanDefinitionDocumentReader.processBeanDefinition:
-
-  ```java
-  protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {
-  	BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
-  	if (bdHolder != null) {
-  		bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
-  		try {
-  			// Register the final decorated instance.
-  			BeanDefinitionReaderUtils.registerBeanDefinition
-  				(bdHolder, getReaderContext().getRegistry());
-  		}
-  		catch (BeanDefinitionStoreException ex) {
-  			getReaderContext().error("Failed to register bean definition with name '" +
-  					bdHolder.getBeanName() + "'", ele, ex);
-  		}
-  		// Send registration event.
-  		getReaderContext().fireComponentRegistered(new BeanComponentDefinition(bdHolder));
-  	}
-  }
-  ```
-
-  解析:
-
-  id & name处理:
-
-  最终调用BeanDefinitionParserDelegate.parseBeanDefinitionElement(Element ele, BeanDefinition containingBean)，源码较长，分部分说明。
-
-  首先获取到id和name属性，**name属性支持配置多个，以逗号分隔，如果没有指定id，那么将以第一个name属性值代替。id必须是唯一的，name属性其实是alias的角色，可以和其它的bean重复，如果name也没有配置，那么其实什么也没做**。
-
-  ```java
-  String id = ele.getAttribute(ID_ATTRIBUTE);
-  String nameAttr = ele.getAttribute(NAME_ATTRIBUTE);
-  List<String> aliases = new ArrayList<String>();
-  if (StringUtils.hasLength(nameAttr)) {
-    	//按,分隔
-  	String[] nameArr = StringUtils.tokenizeToStringArray
-  		(nameAttr, MULTI_VALUE_ATTRIBUTE_DELIMITERS);
-  	aliases.addAll(Arrays.asList(nameArr));
-  }
-  String beanName = id;
-  if (!StringUtils.hasText(beanName) && !aliases.isEmpty()) {
-    	//name的第一个值作为id
-  	beanName = aliases.remove(0);
-  }
-  //默认null
-  if (containingBean == null) {
-    	//校验id是否已重复，如果重复直接抛异常
-    	//校验是通过内部一个HashSet完成的，出现过的id都会保存进此Set
-  	checkNameUniqueness(beanName, aliases, ele);
-  }
-  ```
-
-  bean解析:
-
-  还是分部分说明(parseBeanDefinitionElement)。
-
-  首先获取到bean的class属性和parent属性，配置了parent之后，当前bean会继承父bean的属性。之后根据class和parent创建BeanDefinition对象。
-
-  ```java
-  String className = null;
-  if (ele.hasAttribute(CLASS_ATTRIBUTE)) {
-  	className = ele.getAttribute(CLASS_ATTRIBUTE).trim();
-  }
-  String parent = null;
-  if (ele.hasAttribute(PARENT_ATTRIBUTE)) {
-  	parent = ele.getAttribute(PARENT_ATTRIBUTE);
-  }
-  AbstractBeanDefinition bd = createBeanDefinition(className, parent);
-  ```
-
-  BeanDefinition的创建在BeanDefinitionReaderUtils.createBeanDefinition:
-
-  ```java
-  public static AbstractBeanDefinition createBeanDefinition(
-  		String parentName, String className, ClassLoader classLoader) {
-  	GenericBeanDefinition bd = new GenericBeanDefinition();
-  	bd.setParentName(parentName);
-  	if (className != null) {
-  		if (classLoader != null) {
-  			bd.setBeanClass(ClassUtils.forName(className, classLoader));
-  		}
-  		else {
-  			bd.setBeanClassName(className);
-  		}
-  	}
-  	return bd;
-  }
-  ```
-
-  之后是解析bean的其它属性，其实就是读取其配置，调用相应的setter方法保存在BeanDefinition中:
-
-  ```java
-  parseBeanDefinitionAttributes(ele, beanName, containingBean, bd);
-  ```
-
-  之后解析bean的decription子元素:
-
-  ```xml
-  <bean id="b" name="one, two" class="base.SimpleBean">
-  	<description>SimpleBean</description>
-  </bean>
-  ```
-
-  就仅仅是个描述。
-
-  然后是meta子元素的解析，meta元素在xml配置文件里是这样的:
-
-  ```xml
-  <bean id="b" name="one, two" class="base.SimpleBean">
-  	<meta key="name" value="skywalker"/>
-  </bean>
-  ```
-
-  注释上说，这样可以将任意的元数据附到对应的bean definition上。解析过程源码:
-
-  ```java
-  public void parseMetaElements(Element ele, BeanMetadataAttributeAccessor attributeAccessor) {
-  	NodeList nl = ele.getChildNodes();
-  	for (int i = 0; i < nl.getLength(); i++) {
-  		Node node = nl.item(i);
-  		if (isCandidateElement(node) && nodeNameEquals(node, META_ELEMENT)) {
-  			Element metaElement = (Element) node;
-  			String key = metaElement.getAttribute(KEY_ATTRIBUTE);
-  			String value = metaElement.getAttribute(VALUE_ATTRIBUTE);
-            	 //就是一个key, value的载体，无他
-  			BeanMetadataAttribute attribute = new BeanMetadataAttribute(key, value);
-            	 //sourceExtractor默认是NullSourceExtractor，返回的是空
-  			attribute.setSource(extractSource(metaElement));
-  			attributeAccessor.addMetadataAttribute(attribute);
-  		}
-  	}
-  }
-  ```
-
-  AbstractBeanDefinition继承自BeanMetadataAttributeAccessor类，底层使用了一个LinkedHashMap保存metadata。这个metadata具体是做什么暂时还不知道。
-
-  lookup-method解析：
-
-  此标签的作用在于当一个bean的某个方法被设置为lookup-method后，**每次调用此方法时，都会返回一个新的指定bean的对象**。用法示例:
-
-  ```xml
-  <bean id="apple" class="cn.com.willchen.test.di.Apple" scope="prototype"/>
-  <!--水果盘-->
-  <bean id="fruitPlate" class="cn.com.willchen.test.di.FruitPlate">
-      <lookup-method name="getFruit" bean="apple"/>
-  </bean>
-  ```
-
-  数据保存在Set中，对应的类是MethodOverrides。可以参考:
-
-  [Spring - lookup-method方式实现依赖注入](http://www.cnblogs.com/ViviChan/p/4981619.html)
-
-  replace-mothod解析:
-
-  此标签用于替换bean里面的特定的方法实现，替换者必须实现Spring的MethodReplacer接口，有点像aop的意思。
-
-  配置文件示例:
-
-  ```xml
-  <bean name="replacer" class="springroad.deomo.chap4.MethodReplace" />  
-  <bean name="testBean" class="springroad.deomo.chap4.LookupMethodBean">
-  	<replaced-method name="test" replacer="replacer">
-    		<arg-type match="String" />
-    	</replaced-method>  
-  </bean> 
-  ```
-
-  arg-type的作用是指定替换方法的参数类型，因为接口的定义参数都是Object的。参考: [SPRING.NET 1.3.2 学习20--方法注入之替换方法注入](http://blog.csdn.net/lee576/article/details/8725548)
-
-  解析之后将数据放在ReplaceOverride对象中，里面有一个LinkedList<String>专门用于保存arg-type。
-
-  构造参数(constructor-arg)解析:
-
-  作用一目了然，使用示例:
-
-  ```xml
-  <bean class="base.SimpleBean">
-  	<constructor-arg>
-    		<value type="java.lang.String">Cat</value>
-  	</constructor-arg>
-  </bean>
-  ```
-
-  type一般不需要指定，除了泛型集合那种。除此之外，constructor-arg还支持name, index, ref等属性，可以具体的指定参数的位置等。构造参数解析后保存在BeanDefinition内部一个ConstructorArgumentValues对象中。如果设置了index属性，那么以Map<Integer, ValueHolder>的形式保存，反之，以List<ValueHolder>的形式保存。
-
-  property解析:
-
-  非常常用的标签，用以为bean的属性赋值，支持value和ref两种形式，示例:
-
-  ```xml
-  <bean class="base.SimpleBean">
-  	<property name="name" value="skywalker" />
-  </bean>
-  ```
-
-  value和ref属性不能同时出现，如果是ref，那么将其值保存在不可变的RuntimeBeanReference对象中，其实现了BeanReference接口，此接口只有一个getBeanName方法。如果是value，那么将其值保存在TypedStringValue对象中。最终将对象保存在BeanDefinition内部一个MutablePropertyValues对象中(内部以ArrayList实现)。
-
-  qualifier解析:
-
-  配置示例:
-
-  ```xml
-  <bean class="base.Student">
-  	<property name="name" value="skywalker"></property>
-  	<property name="age" value="12"></property>
-    	<qualifier type="org.springframework.beans.factory.annotation.Qualifier" value="student" />
-  </bean>	
-  <bean class="base.Student">
-  	<property name="name" value="seaswalker"></property>
-  	<property name="age" value="15"></property>
-  	<qualifier value="student_2"></qualifier>
-  </bean>
-  <bean class="base.SimpleBean" />
-  ```
-
-  SimpleBean部分源码:
-
-  ```java
-  @Autowired
-  @Qualifier("student")
-  private Student student;
-  ```
-
-  此标签和@Qualifier, @Autowired两个注解一起使用才有作用。@Autowired注解采用按类型查找的方式进行注入，如果找到多个需要类型的bean便会报错，有了@Qualifier标签就可以再按照此注解指定的名称查找。两者结合相当于实现了按类型+名称注入。type属性可以不指定，因为默认就是那个。qualifier标签可以有attribute子元素，比如:
-
-  ```xml
-  <qualifier type="org.springframework.beans.factory.annotation.Qualifier" value="student">
-  	<attribute key="id" value="1"/>
-  </qualifier>
-  ```
-
-  貌似是用来在qualifier也区分不开的时候使用。attribute键值对保存在BeanMetadataAttribute对象中。整个qualifier保存在AutowireCandidateQualifier对象中。
-
-  总结
-
-  BeanDefiniton数据结构如下图:
-
-  ![BeanDefinition数据结构](images/BeanDefinition.jpg)
-
-  ​
+##### import
+
+写法示例:
+
+```xml
+<import resource="CTIContext.xml" />
+<import resource="customerContext.xml" />
+```
+
+importBeanDefinitionResource套路和之前的配置文件加载完全一样，不过注意被import进来的文件是先于当前文件 被解析的。
+
+##### alias
+
+加入有一个bean名为componentA-dataSource，但是另一个组件想以componentB-dataSource的名字使用，就可以这样定义:
+
+```xml
+<alias name="componentA-dataSource" alias="componentB-dataSource"/>
+```
+
+processAliasRegistration核心源码:
+
+```java
+protected void processAliasRegistration(Element ele) {
+	String name = ele.getAttribute(NAME_ATTRIBUTE);
+	String alias = ele.getAttribute(ALIAS_ATTRIBUTE);
+	getReaderContext().getRegistry().registerAlias(name, alias);
+	getReaderContext().fireAliasRegistered(name, alias, extractSource(ele));
+}
+```
+
+从前面的源码可以发现，registry其实就是DefaultListableBeanFactory，它实现了BeanDefinitionRegistry接口。registerAlias方法的实现在SimpleAliasRegistry:
+
+```java
+@Override
+public void registerAlias(String name, String alias) {
+	Assert.hasText(name, "'name' must not be empty");
+	Assert.hasText(alias, "'alias' must not be empty");
+  	//名字和别名一样
+	if (alias.equals(name)) {
+      	//ConcurrentHashMap
+		this.aliasMap.remove(alias);
+	} else {
+		String registeredName = this.aliasMap.get(alias);
+		if (registeredName != null) {
+			if (registeredName.equals(name)) {
+				// An existing alias - no need to re-register
+				return;
+			}
+			if (!allowAliasOverriding()) {
+				throw new IllegalStateException
+					("Cannot register alias '" + alias + "' for name '" +
+					name + "': It is already registered for name '" + registeredName + "'.");
+			}
+		}
+		checkForAliasCircle(name, alias);
+		this.aliasMap.put(alias, name);
+	}
+}
+```
+
+所以别名关系的保存使用Map完成，key为别名，value为本来的名字。
+
+##### bean
+
+bean节点是Spring最最常见的节点了。
+
+DefaultBeanDefinitionDocumentReader.processBeanDefinition:
+
+```java
+protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {
+	BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
+	if (bdHolder != null) {
+		bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
+		try {
+			// Register the final decorated instance.
+			BeanDefinitionReaderUtils.registerBeanDefinition
+				(bdHolder, getReaderContext().getRegistry());
+		}
+		catch (BeanDefinitionStoreException ex) {
+			getReaderContext().error("Failed to register bean definition with name '" +
+					bdHolder.getBeanName() + "'", ele, ex);
+		}
+		// Send registration event.
+		getReaderContext().fireComponentRegistered(new BeanComponentDefinition(bdHolder));
+	}
+}
+```
+
+###### id & name处理
+
+最终调用BeanDefinitionParserDelegate.parseBeanDefinitionElement(Element ele, BeanDefinition containingBean)，源码较长，分部分说明。
+
+首先获取到id和name属性，**name属性支持配置多个，以逗号分隔，如果没有指定id，那么将以第一个name属性值代替。id必须是唯一的，name属性其实是alias的角色，可以和其它的bean重复，如果name也没有配置，那么其实什么也没做**。
+
+```java
+String id = ele.getAttribute(ID_ATTRIBUTE);
+String nameAttr = ele.getAttribute(NAME_ATTRIBUTE);
+List<String> aliases = new ArrayList<String>();
+if (StringUtils.hasLength(nameAttr)) {
+  	//按,分隔
+	String[] nameArr = StringUtils.tokenizeToStringArray
+		(nameAttr, MULTI_VALUE_ATTRIBUTE_DELIMITERS);
+	aliases.addAll(Arrays.asList(nameArr));
+}
+String beanName = id;
+if (!StringUtils.hasText(beanName) && !aliases.isEmpty()) {
+  	//name的第一个值作为id
+	beanName = aliases.remove(0);
+}
+//默认null
+if (containingBean == null) {
+  	//校验id是否已重复，如果重复直接抛异常
+  	//校验是通过内部一个HashSet完成的，出现过的id都会保存进此Set
+	checkNameUniqueness(beanName, aliases, ele);
+}
+```
+
+###### bean解析
+
+还是分部分说明(parseBeanDefinitionElement)。
+
+首先获取到bean的class属性和parent属性，配置了parent之后，当前bean会继承父bean的属性。之后根据class和parent创建BeanDefinition对象。
+
+```java
+String className = null;
+if (ele.hasAttribute(CLASS_ATTRIBUTE)) {
+	className = ele.getAttribute(CLASS_ATTRIBUTE).trim();
+}
+String parent = null;
+if (ele.hasAttribute(PARENT_ATTRIBUTE)) {
+	parent = ele.getAttribute(PARENT_ATTRIBUTE);
+}
+AbstractBeanDefinition bd = createBeanDefinition(className, parent);
+```
+
+BeanDefinition的创建在BeanDefinitionReaderUtils.createBeanDefinition:
+
+```java
+public static AbstractBeanDefinition createBeanDefinition(
+		String parentName, String className, ClassLoader classLoader) {
+	GenericBeanDefinition bd = new GenericBeanDefinition();
+	bd.setParentName(parentName);
+	if (className != null) {
+		if (classLoader != null) {
+			bd.setBeanClass(ClassUtils.forName(className, classLoader));
+		}
+		else {
+			bd.setBeanClassName(className);
+		}
+	}
+	return bd;
+}
+```
+
+之后是解析bean的其它属性，其实就是读取其配置，调用相应的setter方法保存在BeanDefinition中:
+
+```java
+parseBeanDefinitionAttributes(ele, beanName, containingBean, bd);
+```
+
+之后解析bean的decription子元素:
+
+```xml
+<bean id="b" name="one, two" class="base.SimpleBean">
+	<description>SimpleBean</description>
+</bean>
+```
+
+就仅仅是个描述。
+
+然后是meta子元素的解析，meta元素在xml配置文件里是这样的:
+
+```xml
+<bean id="b" name="one, two" class="base.SimpleBean">
+	<meta key="name" value="skywalker"/>
+</bean>
+```
+
+注释上说，这样可以将任意的元数据附到对应的bean definition上。解析过程源码:
+
+```java
+public void parseMetaElements(Element ele, BeanMetadataAttributeAccessor attributeAccessor) {
+	NodeList nl = ele.getChildNodes();
+	for (int i = 0; i < nl.getLength(); i++) {
+		Node node = nl.item(i);
+		if (isCandidateElement(node) && nodeNameEquals(node, META_ELEMENT)) {
+			Element metaElement = (Element) node;
+			String key = metaElement.getAttribute(KEY_ATTRIBUTE);
+			String value = metaElement.getAttribute(VALUE_ATTRIBUTE);
+          	 //就是一个key, value的载体，无他
+			BeanMetadataAttribute attribute = new BeanMetadataAttribute(key, value);
+          	 //sourceExtractor默认是NullSourceExtractor，返回的是空
+			attribute.setSource(extractSource(metaElement));
+			attributeAccessor.addMetadataAttribute(attribute);
+		}
+	}
+}
+```
+
+AbstractBeanDefinition继承自BeanMetadataAttributeAccessor类，底层使用了一个LinkedHashMap保存metadata。这个metadata具体是做什么暂时还不知道。
+
+lookup-method解析：
+
+此标签的作用在于当一个bean的某个方法被设置为lookup-method后，**每次调用此方法时，都会返回一个新的指定bean的对象**。用法示例:
+
+```xml
+<bean id="apple" class="cn.com.willchen.test.di.Apple" scope="prototype"/>
+<!--水果盘-->
+<bean id="fruitPlate" class="cn.com.willchen.test.di.FruitPlate">
+    <lookup-method name="getFruit" bean="apple"/>
+</bean>
+```
+
+数据保存在Set中，对应的类是MethodOverrides。可以参考:
+
+[Spring - lookup-method方式实现依赖注入](http://www.cnblogs.com/ViviChan/p/4981619.html)
+
+replace-mothod解析:
+
+此标签用于替换bean里面的特定的方法实现，替换者必须实现Spring的MethodReplacer接口，有点像aop的意思。
+
+配置文件示例:
+
+```xml
+<bean name="replacer" class="springroad.deomo.chap4.MethodReplace" />  
+<bean name="testBean" class="springroad.deomo.chap4.LookupMethodBean">
+	<replaced-method name="test" replacer="replacer">
+  		<arg-type match="String" />
+  	</replaced-method>  
+</bean> 
+```
+
+arg-type的作用是指定替换方法的参数类型，因为接口的定义参数都是Object的。参考: [SPRING.NET 1.3.2 学习20--方法注入之替换方法注入](http://blog.csdn.net/lee576/article/details/8725548)
+
+解析之后将数据放在ReplaceOverride对象中，里面有一个LinkedList<String>专门用于保存arg-type。
+
+构造参数(constructor-arg)解析:
+
+作用一目了然，使用示例:
+
+```xml
+<bean class="base.SimpleBean">
+	<constructor-arg>
+  		<value type="java.lang.String">Cat</value>
+	</constructor-arg>
+</bean>
+```
+
+type一般不需要指定，除了泛型集合那种。除此之外，constructor-arg还支持name, index, ref等属性，可以具体的指定参数的位置等。构造参数解析后保存在BeanDefinition内部一个ConstructorArgumentValues对象中。如果设置了index属性，那么以Map<Integer, ValueHolder>的形式保存，反之，以List<ValueHolder>的形式保存。
+
+property解析:
+
+非常常用的标签，用以为bean的属性赋值，支持value和ref两种形式，示例:
+
+```xml
+<bean class="base.SimpleBean">
+	<property name="name" value="skywalker" />
+</bean>
+```
+
+value和ref属性不能同时出现，如果是ref，那么将其值保存在不可变的RuntimeBeanReference对象中，其实现了BeanReference接口，此接口只有一个getBeanName方法。如果是value，那么将其值保存在TypedStringValue对象中。最终将对象保存在BeanDefinition内部一个MutablePropertyValues对象中(内部以ArrayList实现)。
+
+qualifier解析:
+
+配置示例:
+
+```xml
+<bean class="base.Student">
+	<property name="name" value="skywalker"></property>
+	<property name="age" value="12"></property>
+  	<qualifier type="org.springframework.beans.factory.annotation.Qualifier" value="student" />
+</bean>	
+<bean class="base.Student">
+	<property name="name" value="seaswalker"></property>
+	<property name="age" value="15"></property>
+	<qualifier value="student_2"></qualifier>
+</bean>
+<bean class="base.SimpleBean" />
+```
+
+SimpleBean部分源码:
+
+```java
+@Autowired
+@Qualifier("student")
+private Student student;
+```
+
+此标签和@Qualifier, @Autowired两个注解一起使用才有作用。@Autowired注解采用按类型查找的方式进行注入，如果找到多个需要类型的bean便会报错，有了@Qualifier标签就可以再按照此注解指定的名称查找。两者结合相当于实现了按类型+名称注入。type属性可以不指定，因为默认就是那个。qualifier标签可以有attribute子元素，比如:
+
+```xml
+<qualifier type="org.springframework.beans.factory.annotation.Qualifier" value="student">
+	<attribute key="id" value="1"/>
+</qualifier>
+```
+
+貌似是用来在qualifier也区分不开的时候使用。attribute键值对保存在BeanMetadataAttribute对象中。整个qualifier保存在AutowireCandidateQualifier对象中。
+
+###### Bean装饰
+
+这部分是针对其它schema的属性以及子节点，比如:
+
+```xml
+<bean class="base.Student" primary="true">
+	<context:property-override />
+</bean>
+```
+
+没见过这种用法，留个坑。
+
+###### Bean注册
+
+BeanDefinitionReaderUtils.registerBeanDefinition:
+
+```java
+public static void registerBeanDefinition(
+	BeanDefinitionHolder definitionHolder, BeanDefinitionRegistry registry) {
+	// Register bean definition under primary name.
+	String beanName = definitionHolder.getBeanName();
+	registry.registerBeanDefinition(beanName, definitionHolder.getBeanDefinition());
+	// Register aliases for bean name, if any.
+	String[] aliases = definitionHolder.getAliases();
+	if (aliases != null) {
+		for (String alias : aliases) {
+			registry.registerAlias(beanName, alias);
+		}
+	}
+}
+```
+
+registry其实就是DefaultListableBeanFactory对象，registerBeanDefinition方法主要就干了这么两件事:
+
+```java
+@Override
+public void registerBeanDefinition(String beanName, BeanDefinition beanDefinition) {
+	this.beanDefinitionMap.put(beanName, beanDefinition);
+	this.beanDefinitionNames.add(beanName);
+}
+```
+
+一个是Map，另一个是List，一目了然。registerAlias方法的实现在其父类SimpleAliasRegistry，就是把键值对放在了一个ConcurrentHashMap里。
+
+ComponentRegistered事件触发:
+
+默认是个空实现，前面说过了。
+
+###### 总结
+
+BeanDefiniton数据结构如下图:
+
+![BeanDefinition数据结构](images/BeanDefinition.jpg)
+
+##### beans
+
+beans元素的嵌套直接递归调用DefaultBeanDefinitionDocumentReader.parseBeanDefinitions。
+
+#### 其它命名空间解析
+
+入口在DefaultBeanDefinitionDocumentReader.parseBeanDefinitions->BeanDefinitionParserDelegate.parseCustomElement(第二个参数为空):
+
+```java
+public BeanDefinition parseCustomElement(Element ele, BeanDefinition containingBd) {
+	String namespaceUri = getNamespaceURI(ele);
+	NamespaceHandler handler = this.readerContext.getNamespaceHandlerResolver().resolve(namespaceUri);
+	return handler.parse(ele, new ParserContext(this.readerContext, this, containingBd));
+}
+```
+
+NamespaceHandlerResolver由XmlBeanDefinitionReader初始化，是一个DefaultNamespaceHandlerResolver对象，也是NamespaceHandlerResolver接口的唯一实现。
+
+其resolve方法:
+
+```java
+@Override
+public NamespaceHandler resolve(String namespaceUri) {
+	Map<String, Object> handlerMappings = getHandlerMappings();
+	Object handlerOrClassName = handlerMappings.get(namespaceUri);
+	if (handlerOrClassName == null) {
+		return null;
+	} else if (handlerOrClassName instanceof NamespaceHandler) {
+		return (NamespaceHandler) handlerOrClassName;
+	} else {
+		String className = (String) handlerOrClassName;
+		Class<?> handlerClass = ClassUtils.forName(className, this.classLoader);
+		NamespaceHandler namespaceHandler = (NamespaceHandler) BeanUtils.instantiateClass(handlerClass);
+		namespaceHandler.init();
+		handlerMappings.put(namespaceUri, namespaceHandler);
+		return namespaceHandler;
+	}
+}
+```
+
+容易看出，Spring其实使用了一个Map了保存其映射关系，key就是命名空间的uri，value是**NamespaceHandler对象或是Class完整名，如果发现是类名，那么用反射的方法进行初始化，如果是NamespaceHandler对象，那么直接返回**。
+
+NamespaceHandler映射关系来自于各个Spring jar包下的META-INF/spring.handlers文件，以spring-context包为例:
+
+```html
+http\://www.springframework.org/schema/context=org.springframework.context.config.ContextNamespaceHandler
+http\://www.springframework.org/schema/jee=org.springframework.ejb.config.JeeNamespaceHandler
+http\://www.springframework.org/schema/lang=org.springframework.scripting.config.LangNamespaceHandler
+http\://www.springframework.org/schema/task=org.springframework.scheduling.config.TaskNamespaceHandler
+http\://www.springframework.org/schema/cache=org.springframework.cache.config.CacheNamespaceHandler
+```
+
+##### NamespaceHandler继承体系
+
+![NamespaceHandler继承体系](images/NamespaceHandler.jpg)
+
+##### init
+
+resolve中调用了其init方法，此方法用以向NamespaceHandler对象注册BeanDefinitionParser对象。**此接口用以解析顶层(beans下)的非默认命名空间元素，比如`<context:annotation-config />`**。
+
+所以这样逻辑就很容易理解了: **每种子标签的解析仍是策略模式的体现，init负责向父类NamespaceHandlerSupport注册不同的策略，由父类的NamespaceHandlerSupport.parse方法根据具体的子标签调用相应的策略完成解析的过程**。
+
+此部分较为重要，所以重新开始大纲。 
+
+### prepareBeanFactory
+
+此方法负责对BeanFactory进行一些特征的设置工作，"特征"包含这么几个方面:
+
+#### BeanExpressionResolver
+
+此接口只有一个实现: StandardBeanExpressionResolver。接口只含有一个方法:
+
+```java
+Object evaluate(String value, BeanExpressionContext evalContext)
+```
+
+prepareBeanFactory将一个此对象放入BeanFactory:
+
+```java
+beanFactory.setBeanExpressionResolver(new 						 			StandardBeanExpressionResolver(beanFactory.getBeanClassLoader()));
+```
+
+StandardBeanExpressionResolver对象内部有一个关键的成员: SpelExpressionParser,其整个类图:
+
+![ExpressionParser继承体系](images/ExpressionParser.jpg)
+
+这便是Spring3.0开始出现的Spel表达式的解释器。
+
+#### PropertyEditorRegistrar
+
+此接口用于向Spring注册java.beans.PropertyEditor，只有一个方法:
+
+```java
+registerCustomEditors(PropertyEditorRegistry registry)
+```
+
+实现也只有一个: ResourceEditorRegistrar。
+
+在编写xml配置时，我们设置的值都是字符串形式，所以在使用时肯定需要转为我们需要的类型，PropertyEditor接口正是定义了这么个东西。
+
+# spring-context
+
+入口方法在BeanDefinitionParserDelegate.parseCustomElement：
+
+```java
+return handler.parse(ele, new ParserContext(this.readerContext, this, containingBd));
+```
+
+## annotation-config
+
+AnnotationConfigBeanDefinitionParser.parse:
+
+```java
+@Override
+public BeanDefinition parse(Element element, ParserContext parserContext) {
+	Object source = parserContext.extractSource(element);
+	// Obtain bean definitions for all relevant BeanPostProcessors.
+	Set<BeanDefinitionHolder> processorDefinitions =
+			AnnotationConfigUtils.
+				registerAnnotationConfigProcessors(parserContext.getRegistry(), source);
+	// Register component for the surrounding <context:annotation-config> element.
+	CompositeComponentDefinition compDefinition = 
+		new CompositeComponentDefinition(element.getTagName(), source);
+	parserContext.pushContainingComponent(compDefinition);
+	// Nest the concrete beans in the surrounding component.
+	for (BeanDefinitionHolder processorDefinition : processorDefinitions) {
+		parserContext.registerComponent(new BeanComponentDefinition(processorDefinition));
+	}
+	// Finally register the composite component.
+	parserContext.popAndRegisterContainingComponent();
+	return null;
+}
+```
+
+
+
+
+
+
 

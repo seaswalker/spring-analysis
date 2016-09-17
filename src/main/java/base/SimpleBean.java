@@ -1,8 +1,5 @@
 package base;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
-
 /**
  * SimpleBean
  * 
@@ -11,7 +8,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
  */
 public class SimpleBean {
 	
-	@Autowired
 	private Student student;
 	
 	public Student getStudent() {

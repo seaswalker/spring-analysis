@@ -13,21 +13,15 @@
         http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-4.0.xsd  
         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd">    
 
-	<context:annotation-config />
-
-	<bean class="base.Student" primary="true">
+	<bean id="student" class="base.Student" primary="true">
 		<property name="name" value="skywalker"></property>
 		<property name="age" value="12"></property>
-  		<qualifier type="org.springframework.beans.factory.annotation.Qualifier" value="student" />
-		<context:property-override />
 	</bean>
 	
-	<bean class="base.Student">
-		<property name="name" value="seaswalker"></property>
-		<property name="age" value="15"></property>
-		<qualifier value="student_2"></qualifier>
-	</bean>
-
-  	<bean class="base.SimpleBean" />
+  	<bean class="base.SimpleBean">
+  		<property name="student" ref="student"></property>
+  	</bean>
+  	
+  	<bean class="base.SimpleBeanFactoryPostProcessor" />
   	
 </beans>

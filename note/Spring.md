@@ -855,7 +855,7 @@ public boolean acceptsProfiles(String... profiles) {
 
 preProcessXml方法是个空实现，供子类去覆盖，**目的在于给子类一个把我们自定义的标签转为Spring标准标签的机会**, 想的真周到。
 
-parseBeanDefinitions：
+DefaultBeanDefinitionDocumentReader.parseBeanDefinitions：
 
 ```java
 protected void parseBeanDefinitions(Element root, BeanDefinitionParserDelegate delegate) {
@@ -1017,6 +1017,51 @@ if (containingBean == null) {
   	//校验id是否已重复，如果重复直接抛异常
   	//校验是通过内部一个HashSet完成的，出现过的id都会保存进此Set
 	checkNameUniqueness(beanName, aliases, ele);
+}
+```
+
+###### beanName生成
+
+如果name和id属性都没有指定，那么Spring会自己生成一个, BeanDefinitionParserDelegate.parseBeanDefinitionElement:
+
+```java
+beanName = this.readerContext.generateBeanName(beanDefinition);
+String beanClassName = beanDefinition.getBeanClassName();
+aliases.add(beanClassName);
+```
+
+可见，Spring同时会把类名作为其别名。
+
+最终调用的是BeanDefinitionReaderUtils.generateBeanName:
+
+```java
+public static String generateBeanName(
+		BeanDefinition definition, BeanDefinitionRegistry registry, boolean isInnerBean) {
+	String generatedBeanName = definition.getBeanClassName();
+	if (generatedBeanName == null) {
+		if (definition.getParentName() != null) {
+			generatedBeanName = definition.getParentName() + "$child";
+          	 //工厂方法产生的bean
+		} else if (definition.getFactoryBeanName() != null) {
+			generatedBeanName = definition.getFactoryBeanName() + "$created";
+		}
+	}
+	String id = generatedBeanName;
+	if (isInnerBean) {
+		// Inner bean: generate identity hashcode suffix.
+		id = generatedBeanName + GENERATED_BEAN_NAME_SEPARATOR + 
+			ObjectUtils.getIdentityHexString(definition);
+	} else {
+		// Top-level bean: use plain class name.
+		// Increase counter until the id is unique.
+		int counter = -1;
+      	 //用类名#自增的数字命名
+		while (counter == -1 || registry.containsBeanDefinition(id)) {
+			counter++;
+			id = generatedBeanName + GENERATED_BEAN_NAME_SEPARATOR + counter;
+		}
+	}
+	return id;
 }
 ```
 
@@ -1249,7 +1294,7 @@ ComponentRegistered事件触发:
 
 默认是个空实现，前面说过了。
 
-###### 总结
+###### BeanDefiniton数据结构
 
 BeanDefiniton数据结构如下图:
 
@@ -1319,6 +1364,12 @@ resolve中调用了其init方法，此方法用以向NamespaceHandler对象注�
 
 此部分较为重要，所以重新开始大纲。 
 
+##### BeanFactory数据结构
+
+BeanDefinition在BeanFactory中的主要数据结构如下图:
+
+![Beanfactory数据结构](images/Beanfactory_structure.jpg)
+
 ### prepareBeanFactory
 
 此方法负责对BeanFactory进行一些特征的设置工作，"特征"包含这么几个方面:
@@ -1354,6 +1405,161 @@ registerCustomEditors(PropertyEditorRegistry registry)
 实现也只有一个: ResourceEditorRegistrar。
 
 在编写xml配置时，我们设置的值都是字符串形式，所以在使用时肯定需要转为我们需要的类型，PropertyEditor接口正是定义了这么个东西。
+
+prepareBeanFactory:
+
+```java
+beanFactory.addPropertyEditorRegistrar(new ResourceEditorRegistrar(this, getEnvironment()));
+```
+
+BeanFactory也暴露了registerCustomEditors方法用以添加自定义的转换器，所以这个地方是组合模式的体现。
+
+我们有两种方式可以添加自定义PropertyEditor:
+
+- 通过`context.getBeanFactory().registerCustomEditor`
+
+- 通过Spring配置文件:
+
+  ```xml
+  <bean class="org.springframework.beans.factory.config.CustomEditorConfigurer">
+  	<property name="customEditors">
+    		<map>
+    			<entry key="base.Cat" value="base.CatEditor" /> 
+  		</map>
+  	</property>
+  </bean>
+  ```
+
+参考: [深入理解JavaBean(2)：属性编辑器PropertyEditor](http://blog.csdn.net/zhoudaxia/article/details/36247883)
+
+#### 环境注入
+
+在Spring中我们自己的bean可以通过实现EnvironmentAware等一系列Aware接口获取到Spring内部的一些对象。prepareBeanFactory:
+
+```java
+beanFactory.addBeanPostProcessor(new ApplicationContextAwareProcessor(this));
+```
+
+ApplicationContextAwareProcessor核心的invokeAwareInterfaces方法:
+
+```java
+private void invokeAwareInterfaces(Object bean) {
+	if (bean instanceof Aware) {
+		if (bean instanceof EnvironmentAware) {
+			((EnvironmentAware) bean).setEnvironment(this.applicationContext.getEnvironment());
+		}
+    	if (bean instanceof EmbeddedValueResolverAware) {
+			((EmbeddedValueResolverAware) bean).setEmbeddedValueResolver(this.embeddedValueResolver);
+		}
+      	//....
+	}
+}
+```
+
+#### 依赖解析忽略
+
+此部分设置哪些接口在进行依赖注入的时候应该被忽略:
+
+```java
+beanFactory.ignoreDependencyInterface(ResourceLoaderAware.class);
+beanFactory.ignoreDependencyInterface(ApplicationEventPublisherAware.class);
+beanFactory.ignoreDependencyInterface(MessageSourceAware.class);
+beanFactory.ignoreDependencyInterface(ApplicationContextAware.class);
+beanFactory.ignoreDependencyInterface(EnvironmentAware.class);
+```
+
+#### bean伪装
+
+有些对象并不在BeanFactory中，但是我们依然想让它们可以被装配，这就需要伪装一下:
+
+```java
+beanFactory.registerResolvableDependency(BeanFactory.class, beanFactory);
+beanFactory.registerResolvableDependency(ResourceLoader.class, this);
+beanFactory.registerResolvableDependency(ApplicationEventPublisher.class, this);
+beanFactory.registerResolvableDependency(ApplicationContext.class, this);
+```
+
+伪装关系保存在一个Map<Class<?>, Object>里。
+
+#### LoadTimeWeaver
+
+如果配置了此bean，那么：
+
+```java
+if (beanFactory.containsBean(LOAD_TIME_WEAVER_BEAN_NAME)) {
+	beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor(beanFactory));
+	// Set a temporary ClassLoader for type matching.
+	beanFactory.setTempClassLoader(new ContextTypeMatchClassLoader(beanFactory.getBeanClassLoader()));
+}
+```
+
+这个东西具体是干什么的在后面context:load-time-weaver中说明。
+
+#### 注册环境
+
+源码:
+
+```java
+if (!beanFactory.containsLocalBean(ENVIRONMENT_BEAN_NAME)) {
+	beanFactory.registerSingleton(ENVIRONMENT_BEAN_NAME, getEnvironment());
+}
+if (!beanFactory.containsLocalBean(SYSTEM_PROPERTIES_BEAN_NAME)) {
+	beanFactory.registerSingleton(SYSTEM_PROPERTIES_BEAN_NAME, getEnvironment().getSystemProperties());
+}
+if (!beanFactory.containsLocalBean(SYSTEM_ENVIRONMENT_BEAN_NAME)) {
+	beanFactory.registerSingleton(SYSTEM_ENVIRONMENT_BEAN_NAME, getEnvironment().
+		getSystemEnvironment());
+}
+```
+
+containsLocalBean特殊之处在于不会去父BeanFactory寻找。
+
+### postProcessBeanFactory
+
+此方法允许子类在所有的bean尚未初始化之前注册BeanPostProcessor。空实现且没有子类覆盖。
+
+### invokeBeanFactoryPostProcessors
+
+BeanFactoryPostProcessor接口允许我们在bean正是初始化之前改变其值。此接口只有一个方法:
+
+```java
+void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory);
+```
+
+有两种方式可以向Spring添加此对象:
+
+- 通过代码的方式:
+
+  ```java
+  context.addBeanFactoryPostProcessor
+  ```
+
+- 通过xml配置的方式:
+
+  ```xml
+  <bean class="base.SimpleBeanFactoryPostProcessor" />
+  ```
+
+注意此时尚未进行bean的初始化工作，初始化是在后面的finishBeanFactoryInitialization进行的，所以在BeanFactoryPostProcessor对象中获取bean会导致提前初始化。
+
+此方法的关键源码:
+
+```java
+protected void invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory beanFactory) {
+	PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(beanFactory,
+		getBeanFactoryPostProcessors());
+}
+```
+
+getBeanFactoryPostProcessors获取的就是AbstractApplicationContext的成员beanFactoryPostProcessors(ArrayList)，但是很有意思，**只有通过context.addBeanFactoryPostProcessor这种方式添加的才会出现在这个List里，所以对于xml配置方式，此List其实没有任何元素。玄机就在PostProcessorRegistrationDelegate里**。
+
+核心思想就是使用BeanFactory的getBeanNamesForType方法获取相应的BeanDefinition的name数组，之后逐一调用getBean方法获取到bean(初始化)，getBean方法后面再说。
+
+注意此处有一个优先级的概念，如果你的BeanFactoryPostProcessor同时实现了Ordered或者是PriorityOrdered接口，那么会被首先执行。
+
+### BeanPostProcessor注册
+
+
 
 # spring-context
 

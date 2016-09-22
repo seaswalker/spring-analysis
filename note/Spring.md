@@ -1559,7 +1559,11 @@ getBeanFactoryPostProcessors获取的就是AbstractApplicationContext的成员be
 
 ### BeanPostProcessor注册
 
+此部分实质上是在BeanDefinitions中寻找BeanPostProcessor，之后调用BeanFactory.addBeanPostProcessor方法保存在一个List中，注意添加时仍然有优先级的概念，优先级高的在前面。
 
+### MessageSource
+
+此接口用以支持Spring国际化。
 
 # spring-context
 

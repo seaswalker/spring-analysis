@@ -1563,7 +1563,144 @@ getBeanFactoryPostProcessors获取的就是AbstractApplicationContext的成员be
 
 ### MessageSource
 
-此接口用以支持Spring国际化。
+此接口用以支持Spring国际化。继承体系如下:
+
+![MessageSource继承体系](images/MessageSource.jpg)
+
+AbstractApplicationContext的initMessageSource()方法就是在BeanFactory中查找MessageSource的bean，如果配置了此bean，那么调用getBean方法完成其初始化并将其保存在AbstractApplicationContext内部messageSource成员变量中，用以处理ApplicationContext的getMessage调用，因为从继承体系上来看，ApplicationContext是MessageSource的子类，此处是委托模式的体现。如果没有配置此bean，那么初始化一个DelegatingMessageSource对象，此类是一个空实现，同样用以处理getMessage调用请求。
+
+参考: [学习Spring必学的Java基础知识(8)----国际化信息](http://stamen.iteye.com/blog/1541732)
+
+### 事件驱动
+
+此接口代表了Spring的事件驱动(监听器)模式。一个事件驱动包含三部分:
+
+#### 事件
+
+java的所有事件对象一般都是java.util.EventObject的子类，Spring的整个继承体系如下:
+
+![EventObject继承体系](images/EventObject.jpg)
+
+#### 发布者
+
+##### ApplicationEventPublisher
+
+![ApplicationEventPublisher继承体系](images/ApplicationEventPublisher.jpg)
+
+一目了然。
+
+##### ApplicationEventMulticaster
+
+ApplicationEventPublisher实际上正是将请求委托给ApplicationEventMulticaster来实现的。其继承体系:
+
+![ApplicationEventMulticaster继承体系](images/ApplicationEventMulticaster.jpg)
+
+#### 监听器
+
+所有的监听器是jdk EventListener的子类，这是一个mark接口。继承体系:
+
+![EventListener继承体系](images/EventListener.jpg)
+
+可以看出SmartApplicationListener和GenericApplicationListener是高度相似的，都提供了事件类型检测和顺序机制，而后者是从Spring4.2加入的，Spring官方文档推荐使用后者代替前者。
+
+#### 初始化
+
+前面说过ApplicationEventPublisher是通过委托给ApplicationEventMulticaster实现的，所以refresh方法中完成的是对ApplicationEventMulticaster的初始化:
+
+```java
+// Initialize event multicaster for this context.
+initApplicationEventMulticaster();
+```
+
+initApplicationEventMulticaster则首先在BeanFactory中寻找ApplicationEventMulticaster的bean，如果找到，那么调用getBean方法将其初始化，如果找不到那么使用SimpleApplicationEventMulticaster。
+
+#### 事件发布
+
+AbstractApplicationContext.publishEvent核心代码:
+
+```java
+protected void publishEvent(Object event, ResolvableType eventType) {
+	getApplicationEventMulticaster().multicastEvent(applicationEvent, eventType);
+}
+```
+
+SimpleApplicationEventMulticaster.multicastEvent:
+
+```java
+@Override
+public void multicastEvent(final ApplicationEvent event, ResolvableType eventType) {
+	ResolvableType type = (eventType != null ? eventType : resolveDefaultEventType(event));
+	for (final ApplicationListener<?> listener : getApplicationListeners(event, type)) {
+		Executor executor = getTaskExecutor();
+		if (executor != null) {
+			executor.execute(new Runnable() {
+				@Override
+				public void run() {
+					invokeListener(listener, event);
+				}
+			});
+		} else {
+			invokeListener(listener, event);
+		}
+	}
+}
+```
+
+##### 监听器获取
+
+获取当然还是通过beanFactory的getBean来完成的，值得注意的是Spring在此处使用了缓存(ConcurrentHashMap)来加速查找的过程。
+
+##### 同步/异步
+
+可以看出，如果executor不为空，那么监听器的执行实际上是异步的。那么如何配置同步/异步呢?
+
+###### 全局
+
+```xml
+<task:executor id="multicasterExecutor" pool-size="3"/>
+<bean class="org.springframework.context.event.SimpleApplicationEventMulticaster">
+	<property name="taskExecutor" ref="multicasterExecutor"></property>
+</bean>
+```
+
+task schema是Spring从3.0开始加入的，使我们可以不再依赖于Quartz实现定时任务，源码在org.springframework.core.task包下，使用需要引入schema：
+
+```xml
+xmlns:task="http://www.springframework.org/schema/task"
+xsi:schemaLocation="http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd"
+```
+
+可以参考: [Spring定时任务的几种实现](http://gong1208.iteye.com/blog/1773177)
+
+###### 注解
+
+开启注解支持:
+
+```xml
+<!-- 开启@AspectJ AOP代理 -->  
+<aop:aspectj-autoproxy proxy-target-class="true"/>  
+<!-- 任务调度器 -->  
+<task:scheduler id="scheduler" pool-size="10"/>  
+<!-- 任务执行器 -->  
+<task:executor id="executor" pool-size="10"/>  
+<!--开启注解调度支持 @Async @Scheduled-->  
+<task:annotation-driven executor="executor" scheduler="scheduler" proxy-target-class="true"/>  
+```
+
+在代码中使用示例:
+
+```java
+@Component  
+public class EmailRegisterListener implements ApplicationListener<RegisterEvent> {  
+    @Async  
+    @Override  
+    public void onApplicationEvent(final RegisterEvent event) {  
+        System.out.println("注册成功，发送确认邮件给：" + ((User)event.getSource()).getUsername());  
+    }  
+}  
+```
+
+参考: [详解Spring事件驱动模型](http://jinnianshilongnian.iteye.com/blog/1902886)
 
 # spring-context
 

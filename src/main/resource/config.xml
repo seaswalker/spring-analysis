@@ -5,13 +5,15 @@
     xmlns:aop="http://www.springframework.org/schema/aop"   
     xmlns:context="http://www.springframework.org/schema/context"  
     xmlns:jee="http://www.springframework.org/schema/jee"  
-    xmlns:tx="http://www.springframework.org/schema/tx"  
+    xmlns:tx="http://www.springframework.org/schema/tx" 
+    xmlns:task="http://www.springframework.org/schema/task" 
     xsi:schemaLocation="    
         http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.0.xsd  
         http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd  
         http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd  
         http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-4.0.xsd  
-        http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd">    
+        http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
+        http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd">    
 
 	<bean id="student" class="base.Student" primary="true">
 		<property name="name" value="skywalker"></property>
@@ -23,5 +25,11 @@
   	</bean>
   	
   	<bean class="base.SimpleBeanFactoryPostProcessor" />
+  	
+  	<task:executor id="multicasterExecutor" pool-size="3"/>
+  	
+  	<bean class="org.springframework.context.event.SimpleApplicationEventMulticaster">
+  		<property name="taskExecutor" ref="multicasterExecutor"></property>
+  	</bean>
   	
 </beans>

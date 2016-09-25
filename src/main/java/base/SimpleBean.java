@@ -10,6 +10,10 @@ public class SimpleBean {
 	
 	private Student student;
 	
+	public SimpleBean(Student student) {
+		this.student = student;
+	}
+
 	public Student getStudent() {
 		return student;
 	}

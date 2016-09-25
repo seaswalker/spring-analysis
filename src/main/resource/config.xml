@@ -15,21 +15,12 @@
         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
         http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd">    
 
-	<bean id="student" class="base.Student" primary="true">
+	<bean id="student" class="base.Student">
 		<property name="name" value="skywalker"></property>
 		<property name="age" value="12"></property>
 	</bean>
 	
-  	<bean class="base.SimpleBean">
-  		<property name="student" ref="student"></property>
-  	</bean>
-  	
-  	<bean class="base.SimpleBeanFactoryPostProcessor"  />
-  	
-  	<task:executor id="multicasterExecutor" pool-size="3"/>
-  	
-  	<bean class="org.springframework.context.event.SimpleApplicationEventMulticaster">
-  		<property name="taskExecutor" ref="multicasterExecutor"></property>
+  	<bean class="base.SimpleBean" autowire="constructor">
   	</bean>
   	
 </beans>

@@ -1930,7 +1930,7 @@ synchronized (this.singletonObjects) {
 
 #### bean创建
 
-源码位于AbstractAutowireCapableBeanFactory.createBean，主要分为两部分:
+源码位于AbstractAutowireCapableBeanFactory.createBean，主要分为几个部分:
 
 ##### lookup-method检测
 
@@ -1974,9 +1974,277 @@ protected void prepareMethodOverride(MethodOverride mo)  {
 }
 ```
 
+##### InstantiationAwareBeanPostProcessor触发
+
+在这里触发的是其postProcessBeforeInitialization和postProcessAfterInstantiation方法。
+
+```java
+Object bean = resolveBeforeInstantiation(beanName, mbdToUse);
+if (bean != null) {
+	return bean;
+}
+Object beanInstance = doCreateBean(beanName, mbdToUse, args);
+return beanInstance;
+```
+
+继续:
+
+```java
+protected Object resolveBeforeInstantiation(String beanName, RootBeanDefinition mbd) {
+	Object bean = null;
+	if (!Boolean.FALSE.equals(mbd.beforeInstantiationResolved)) {
+		// Make sure bean class is actually resolved at this point.
+		if (!mbd.isSynthetic() && hasInstantiationAwareBeanPostProcessors()) {
+			Class<?> targetType = determineTargetType(beanName, mbd);
+			if (targetType != null) {
+				bean = applyBeanPostProcessorsBeforeInstantiation(targetType, beanName);
+				if (bean != null) {
+					bean = applyBeanPostProcessorsAfterInitialization(bean, beanName);
+				}
+			}
+		}
+		mbd.beforeInstantiationResolved = (bean != null);
+	}
+	return bean;
+}
+```
+
+从这里可以看出，**如果InstantiationAwareBeanPostProcessor返回的不是空，那么将不会继续执行剩下的Spring初始化流程，此接口用于初始化自定义的bean，主要是在Spring内部使用**。
+
 ##### doCreateBean
 
+同样分为几部分。
 
+###### 创建(createBeanInstance)
+
+关键代码:
+
+```java
+BeanWrapper instanceWrapper = null;
+if (instanceWrapper == null) {
+	instanceWrapper = createBeanInstance(beanName, mbd, args);
+}
+```
+
+createBeanInstance的创建过程又分为以下几种情况:
+
+- 工厂bean:
+
+  调用instantiateUsingFactoryMethod方法:
+
+  ```java
+  protected BeanWrapper instantiateUsingFactoryMethod(
+  	String beanName, RootBeanDefinition mbd, Object[] explicitArgs) {
+  	return new ConstructorResolver(this).instantiateUsingFactoryMethod(beanName, mbd, explicitArgs);
+  }
+  ```
+
+  注意，此处的工厂bean指的是配置了factory-bean/factory-method属性的bean，不是实现了FacrotyBean接口的bean。如果没有配置factory-bean属性，那么factory-method指向的方法必须是静态的。此方法主要做了这么几件事:
+
+  - 初始化一个BeanWrapperImpl对象。
+
+  - 根据设置的参数列表使用反射的方法寻找相应的方法对象。
+
+  - InstantiationStrategy:
+
+    bean的初始化在此处又抽成了策略模式，类图:
+
+    ![InstantiationStrategy类图](images/InstantiationStrategy.jpg)
+
+    instantiateUsingFactoryMethod部分源码:
+
+    ```java
+    beanInstance = this.beanFactory.getInstantiationStrategy().instantiate(
+    	mbd, beanName, this.beanFactory, factoryBean, factoryMethodToUse, argsToUse);
+    ```
+
+    getInstantiationStrategy返回的是CglibSubclassingInstantiationStrategy对象。此处instantiate实现也很简单，就是调用工厂方法的Method对象反射调用其invoke即可得到对象，SimpleInstantiationStrategy.
+
+    instantiate核心源码:
+
+    ```java
+    @Override
+    public Object instantiate(RootBeanDefinition bd, String beanName, BeanFactory owner,
+    	Object factoryBean, final Method factoryMethod, Object... args) {
+    	return factoryMethod.invoke(factoryBean, args);
+    }
+    ```
+
+- 构造器自动装配
+
+  createBeanInstance部分源码:
+
+  ```java
+  // Need to determine the constructor...
+  Constructor<?>[] ctors = determineConstructorsFromBeanPostProcessors(beanClass, beanName);
+  if (ctors != null ||
+  	mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_CONSTRUCTOR ||
+      //配置了<constructor-arg>子元素
+  	mbd.hasConstructorArgumentValues() || !ObjectUtils.isEmpty(args))  {
+  	return autowireConstructor(beanName, mbd, ctors, args);
+  }
+  ```
+
+  determineConstructorsFromBeanPostProcessors源码:
+
+  ```java
+  protected Constructor<?>[] determineConstructorsFromBeanPostProcessors(Class<?> beanClass, String beanName) {
+  	if (beanClass != null && hasInstantiationAwareBeanPostProcessors()) {
+  		for (BeanPostProcessor bp : getBeanPostProcessors()) {
+  			if (bp instanceof SmartInstantiationAwareBeanPostProcessor) {
+  				SmartInstantiationAwareBeanPostProcessor ibp = 
+  					(SmartInstantiationAwareBeanPostProcessor) bp;
+  				Constructor<?>[] ctors = ibp.determineCandidateConstructors(beanClass, beanName);
+  				if (ctors != null) {
+  					return ctors;
+  				}
+  			}
+  		}
+  	}
+  	return null;
+  }
+  ```
+
+  可见是由SmartInstantiationAwareBeanPostProcessor决定的，默认是没有配置这种东西的。
+
+  之后就是判断bean的自动装配模式，可以通过如下方式配置:
+
+  ```xml
+  <bean id="student" class="base.Student" primary="true" autowire="default" />
+  ```
+
+  autowire共有以下几种选项:
+
+  - no: 默认的，不进行自动装配。在这种情况下，只能通过ref方式引用其它bean。
+  - byName: 根据bean里面属性的名字在BeanFactory中进行查找并装配。
+  - byType: 按类型。
+  - constructor: 以byType的方式查找bean的构造参数列表。
+  - default: 由父bean决定。
+
+  参考: [Spring - bean的autowire属性(自动装配)](http://www.cnblogs.com/ViviChan/p/4981539.html)
+
+  autowireConstructor调用的是ConstructorResolver.autowireConstructor，此方法主要做了两件事:
+
+  - 得到合适的构造器对象。
+
+  - 根据构造器参数的类型去BeanFactory查找相应的bean:
+
+    入口方法在ConstructorResolver.resolveAutowiredArgument:
+
+    ```java
+    protected Object resolveAutowiredArgument(
+    		MethodParameter param, String beanName, Set<String> autowiredBeanNames, 
+    		TypeConverter typeConverter) {
+    	return this.beanFactory.resolveDependency(
+    			new DependencyDescriptor(param, true), beanName, 
+    			autowiredBeanNames, typeConverter);
+    }
+    ```
+
+  最终调用的还是CglibSubclassingInstantiationStrategy.instantiate方法，关键源码:
+
+  ```java
+  @Override
+  public Object instantiate(RootBeanDefinition bd, String beanName, BeanFactory owner,
+  		final Constructor<?> ctor, Object... args) {
+  	if (bd.getMethodOverrides().isEmpty()) {
+        	 //反射调用
+  		return BeanUtils.instantiateClass(ctor, args);
+  	} else {
+  		return instantiateWithMethodInjection(bd, beanName, owner, ctor, args);
+  	}
+  }
+  ```
+
+  可以看出，如果配置了lookup-method标签，**得到的实际上是用Cglib生成的目标类的代理子类**。
+
+  CglibSubclassingInstantiationStrategy.instantiateWithMethodInjection:
+
+  ```java
+  @Override
+  protected Object instantiateWithMethodInjection(RootBeanDefinition bd, String beanName, BeanFactory 	owner,Constructor<?> ctor, Object... args) {
+  	// Must generate CGLIB subclass...
+  	return new CglibSubclassCreator(bd, owner).instantiate(ctor, args);
+  }
+  ```
+
+- 默认构造器
+
+  一行代码，很简单:
+
+  ```java
+  // No special handling: simply use no-arg constructor.
+  return instantiateBean(beanName, mbd);
+  ```
+
+###### MergedBeanDefinitionPostProcessor
+
+触发源码:
+
+```java
+synchronized (mbd.postProcessingLock) {
+	if (!mbd.postProcessed) {
+		applyMergedBeanDefinitionPostProcessors(mbd, beanType, beanName);
+		mbd.postProcessed = true;
+	}
+}
+```
+
+此接口也是Spring内部使用的，不管它了。
+
+###### 属性解析
+
+入口方法: AbstractAutowireCapableBeanFactory.populateBean，它的作用是: 根据autowire类型进行autowire by name，by type 或者是直接进行设置，简略后的源码:
+
+```java
+protected void populateBean(String beanName, RootBeanDefinition mbd, BeanWrapper bw) {
+  	//所有<property>的值
+	PropertyValues pvs = mbd.getPropertyValues();
+
+	if (mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_NAME ||
+			mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_TYPE) {
+		MutablePropertyValues newPvs = new MutablePropertyValues(pvs);
+
+		// Add property values based on autowire by name if applicable.
+		if (mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_NAME) {
+			autowireByName(beanName, mbd, bw, newPvs);
+		}
+
+		// Add property values based on autowire by type if applicable.
+		if (mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_TYPE) {
+			autowireByType(beanName, mbd, bw, newPvs);
+		}
+
+		pvs = newPvs;
+	}
+	//设值
+	applyPropertyValues(beanName, mbd, bw, pvs);
+}
+```
+
+autowireByName源码:
+
+```java
+protected void autowireByName(
+		String beanName, AbstractBeanDefinition mbd, BeanWrapper bw, MutablePropertyValues pvs) {
+  	//返回所有引用(ref="XXX")的bean名称
+	String[] propertyNames = unsatisfiedNonSimpleProperties(mbd, bw);
+	for (String propertyName : propertyNames) {
+		if (containsBean(propertyName)) {
+          	 //从BeanFactory获取
+			Object bean = getBean(propertyName);
+			pvs.add(propertyName, bean);
+			registerDependentBean(propertyName, beanName);
+		}
+	}
+}
+```
+
+autowireByType也是同样的套路，所以可以得出结论: **autowireByName和autowireByType方法只是先获取到引用的bean，真正的设值是在applyPropertyValues中进行的。**
+
+### getObjectForBeanInstance
+
+位于AbstractBeanFactory，此方法的目的在于如果bean是FactoryBean，那么返回其工厂方法创建的bean，而不是自身。
 
 # spring-context
 

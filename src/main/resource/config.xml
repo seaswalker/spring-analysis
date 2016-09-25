@@ -24,7 +24,7 @@
   		<property name="student" ref="student"></property>
   	</bean>
   	
-  	<bean class="base.SimpleBeanFactoryPostProcessor" />
+  	<bean class="base.SimpleBeanFactoryPostProcessor"  />
   	
   	<task:executor id="multicasterExecutor" pool-size="3"/>
   	

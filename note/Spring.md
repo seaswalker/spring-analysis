@@ -1702,6 +1702,282 @@ public class EmailRegisterListener implements ApplicationListener<RegisterEvent>
 
 参考: [详解Spring事件驱动模型](http://jinnianshilongnian.iteye.com/blog/1902886)
 
+### onRefresh
+
+这又是一个模版方法，允许子类在进行bean初始化之前进行一些定制操作。默认空实现。
+
+### ApplicationListener注册
+
+registerListeners方法干的，没什么好说的。
+
+### singleton初始化
+
+finishBeanFactoryInitialization：
+
+```java
+protected void finishBeanFactoryInitialization(ConfigurableListableBeanFactory beanFactory) {
+	if (beanFactory.containsBean(CONVERSION_SERVICE_BEAN_NAME) &&
+			beanFactory.isTypeMatch(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class)) {
+		beanFactory.setConversionService(
+				beanFactory.getBean(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class));
+	}
+	if (!beanFactory.hasEmbeddedValueResolver()) {
+		beanFactory.addEmbeddedValueResolver(new StringValueResolver() {
+			@Override
+			public String resolveStringValue(String strVal) {
+				return getEnvironment().resolvePlaceholders(strVal);
+			}
+		});
+	}
+	String[] weaverAwareNames = beanFactory.getBeanNamesForType
+		(LoadTimeWeaverAware.class, false, false);
+	for (String weaverAwareName : weaverAwareNames) {
+		getBean(weaverAwareName);
+	}
+	// Allow for caching all bean definition metadata, not expecting further changes.
+	beanFactory.freezeConfiguration();
+	// Instantiate all remaining (non-lazy-init) singletons.
+	beanFactory.preInstantiateSingletons();
+}
+```
+
+分部分说明。
+
+#### ConversionService
+
+此接口用于类型之间的转换，在Spring里其实就是把配置文件中的String转为其它类型，从3.0开始出现，目的和jdk的PropertyEditor接口是一样的，参考ConfigurableBeanFactory.setConversionService注释:
+
+> >Specify a Spring 3.0 ConversionService to use for converting
+> > property values, as an alternative to JavaBeans PropertyEditors.
+> > @since 3.0
+
+#### StringValueResolver
+
+用于解析注解的值。接口只定义了一个方法:
+
+```java
+String resolveStringValue(String strVal);
+```
+
+#### LoadTimeWeaverAware
+
+实现了此接口的bean可以得到LoadTimeWeaver，此处仅仅初始化。
+
+#### 初始化
+
+DefaultListableBeanFactory.preInstantiateSingletons:
+
+```java
+@Override
+public void preInstantiateSingletons() throws BeansException {
+	List<String> beanNames = new ArrayList<String>(this.beanDefinitionNames);
+	for (String beanName : beanNames) {
+		RootBeanDefinition bd = getMergedLocalBeanDefinition(beanName);
+		if (!bd.isAbstract() && bd.isSingleton() && !bd.isLazyInit()) {
+			if (isFactoryBean(beanName)) {
+				final FactoryBean<?> factory = (FactoryBean<?>) getBean(FACTORY_BEAN_PREFIX 
+					+ beanName);
+				boolean isEagerInit;
+				if (System.getSecurityManager() != null && factory instanceof SmartFactoryBean) {
+					isEagerInit = AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
+						@Override
+						public Boolean run() {
+							return ((SmartFactoryBean<?>) factory).isEagerInit();
+						}
+					}, getAccessControlContext());
+				}
+				else {
+					isEagerInit = (factory instanceof SmartFactoryBean &&
+							((SmartFactoryBean<?>) factory).isEagerInit());
+				}
+				if (isEagerInit) {
+					getBean(beanName);
+				}
+			}
+			else {
+				getBean(beanName);
+			}
+		}
+	}
+
+	// Trigger post-initialization callback for all applicable beans...
+	for (String beanName : beanNames) {
+		Object singletonInstance = getSingleton(beanName);
+		if (singletonInstance instanceof SmartInitializingSingleton) {
+			final SmartInitializingSingleton smartSingleton = 
+				(SmartInitializingSingleton) singletonInstance;
+			if (System.getSecurityManager() != null) {
+				AccessController.doPrivileged(new PrivilegedAction<Object>() {
+					@Override
+					public Object run() {
+						smartSingleton.afterSingletonsInstantiated();
+						return null;
+					}
+				}, getAccessControlContext());
+			}
+			else {
+				smartSingleton.afterSingletonsInstantiated();
+			}
+		}
+	}
+}
+```
+
+首先进行Singleton的初始化，其中如果bean是FactoryBean类型(注意，只定义了factory-method属性的普通bean并不是FactoryBean)，并且还是SmartFactoryBean类型，那么需要判断是否需要eagerInit(isEagerInit是此接口定义的方法)。
+
+# getBean
+
+这里便是bean初始化的核心逻辑。源码比较复杂，分开说。以getBean(String name)为例。AbstractBeanFactory.getBean:
+
+```java
+@Override
+public Object getBean(String name) throws BeansException {
+	return doGetBean(name, null, null, false);
+}
+```
+
+第二个参数表示bean的Class类型，第三个表示创建bean需要的参数，最后一个表示不需要进行类型检查。
+
+## beanName转化
+
+```java
+final String beanName = transformedBeanName(name);
+```
+
+这里是将FactoryBean的前缀去掉以及将别名转为真实的名字。
+
+## 手动注册bean检测
+
+前面注册环境一节说过，Spring其实手动注册了一些单例bean。这一步就是检测是不是这些bean。如果是，那么再检测是不是工厂bean，如果是返回其工厂方法返回的实例，如果不是返回bean本身。
+
+```java
+Object sharedInstance = getSingleton(beanName);
+if (sharedInstance != null && args == null) {
+	bean = getObjectForBeanInstance(sharedInstance, name, beanName, null);
+}
+```
+
+## 检查父容器
+
+如果父容器存在并且存在此bean定义，那么交由其父容器初始化:
+
+```java
+BeanFactory parentBeanFactory = getParentBeanFactory();
+if (parentBeanFactory != null && !containsBeanDefinition(beanName)) {
+	// Not found -> check parent.
+  	//此方法其实是做了前面beanName转化的逆操作，因为父容器同样会进行转化操作
+	String nameToLookup = originalBeanName(name);
+	if (args != null) {
+		// Delegation to parent with explicit args.
+		return (T) parentBeanFactory.getBean(nameToLookup, args);
+	} else {
+		// No args -> delegate to standard getBean method.
+		return parentBeanFactory.getBean(nameToLookup, requiredType);
+	}
+}
+```
+
+## 依赖初始化
+
+bean可以由depends-on属性配置依赖的bean。Spring会首先初始化依赖的bean。
+
+```java
+String[] dependsOn = mbd.getDependsOn();
+if (dependsOn != null) {
+	for (String dependsOnBean : dependsOn) {
+      	 //检测是否存在循环依赖
+		if (isDependent(beanName, dependsOnBean)) {
+			throw new BeanCreationException(mbd.getResourceDescription(), beanName,
+			"Circular depends-on relationship between '" + beanName + "' and '" + dependsOnBean + "'");
+		}
+		registerDependentBean(dependsOnBean, beanName);
+		getBean(dependsOnBean);
+	}
+}
+```
+
+registerDependentBean进行了依赖关系的注册，这么做的原因是Spring在即进行bean销毁的时候会首先销毁被依赖的bean。依赖关系的保存是通过一个ConcurrentHashMap<String, Set<String>>完成的，key是bean的真实名字。
+
+## Singleton初始化
+
+虽然这里大纲是Singleton初始化，但是getBean方法本身是包括所有scope的初始化，在这里一次说明了。
+
+```java
+if (mbd.isSingleton()) {
+	sharedInstance = getSingleton(beanName, new ObjectFactory<Object>() {
+		@Override
+		public Object getObject() throws BeansException {
+			return createBean(beanName, mbd, args);
+		}
+	});
+	bean = getObjectForBeanInstance(sharedInstance, name, beanName, mbd);
+}
+```
+
+### getSingleton方法
+
+#### 是否存在
+
+首先会检测是否已经存在，如果存在，直接返回:
+
+```java
+synchronized (this.singletonObjects) {
+	Object singletonObject = this.singletonObjects.get(beanName);
+}
+```
+
+所有的单例bean都保存在这样的数据结构中: `ConcurrentHashMap<String, Object>`。
+
+#### bean创建
+
+源码位于AbstractAutowireCapableBeanFactory.createBean，主要分为两部分:
+
+##### lookup-method检测
+
+此部分用于检测lookup-method标签配置的方法是否存在:
+
+```java
+RootBeanDefinition mbdToUse = mbd;
+mbdToUse.prepareMethodOverrides();
+```
+
+prepareMethodOverrides:
+
+```java
+public void prepareMethodOverrides() throws BeanDefinitionValidationException {
+	// Check that lookup methods exists.
+	MethodOverrides methodOverrides = getMethodOverrides();
+	if (!methodOverrides.isEmpty()) {
+		Set<MethodOverride> overrides = methodOverrides.getOverrides();
+		synchronized (overrides) {
+			for (MethodOverride mo : overrides) {
+				prepareMethodOverride(mo);
+			}
+		}
+	}
+}
+```
+
+prepareMethodOverride:
+
+```java
+protected void prepareMethodOverride(MethodOverride mo)  {
+	int count = ClassUtils.getMethodCountForName(getBeanClass(), mo.getMethodName());
+	if (count == 0) {
+		throw new BeanDefinitionValidationException(
+				"Invalid method override: no method with name '" + mo.getMethodName() +
+				"' on class [" + getBeanClassName() + "]");
+	} else if (count == 1) {
+		// Mark override as not overloaded, to avoid the overhead of arg type checking.
+		mo.setOverloaded(false);
+	}
+}
+```
+
+##### doCreateBean
+
+
+
 # spring-context
 
 入口方法在BeanDefinitionParserDelegate.parseCustomElement：

@@ -1,14 +1,22 @@
 package base;
 
+import org.springframework.stereotype.Component;
+
+import javax.annotation.Resource;
+
 /**
  * SimpleBean
  * 
  * @author skywalker
  *
  */
+@Component("simpleBean")
 public class SimpleBean {
-	
+
+    @Resource
 	private Student student;
+
+    public SimpleBean() {}
 	
 	public SimpleBean(Student student) {
 		this.student = student;

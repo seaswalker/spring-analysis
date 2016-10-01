@@ -2246,39 +2246,75 @@ autowireByType也是同样的套路，所以可以得出结论: **autowireByName
 
 位于AbstractBeanFactory，此方法的目的在于如果bean是FactoryBean，那么返回其工厂方法创建的bean，而不是自身。
 
-# spring-context
+## Prototype初始化
 
-入口方法在BeanDefinitionParserDelegate.parseCustomElement：
-
-```java
-return handler.parse(ele, new ParserContext(this.readerContext, this, containingBd));
-```
-
-## annotation-config
-
-AnnotationConfigBeanDefinitionParser.parse:
+AbstractBeanFactory.doGetBean相关源码:
 
 ```java
-@Override
-public BeanDefinition parse(Element element, ParserContext parserContext) {
-	Object source = parserContext.extractSource(element);
-	// Obtain bean definitions for all relevant BeanPostProcessors.
-	Set<BeanDefinitionHolder> processorDefinitions =
-			AnnotationConfigUtils.
-				registerAnnotationConfigProcessors(parserContext.getRegistry(), source);
-	// Register component for the surrounding <context:annotation-config> element.
-	CompositeComponentDefinition compDefinition = 
-		new CompositeComponentDefinition(element.getTagName(), source);
-	parserContext.pushContainingComponent(compDefinition);
-	// Nest the concrete beans in the surrounding component.
-	for (BeanDefinitionHolder processorDefinition : processorDefinitions) {
-		parserContext.registerComponent(new BeanComponentDefinition(processorDefinition));
+else if (mbd.isPrototype()) {
+	// It's a prototype -> create a new instance.
+	Object prototypeInstance = null;
+	try {
+		beforePrototypeCreation(beanName);
+		prototypeInstance = createBean(beanName, mbd, args);
 	}
-	// Finally register the composite component.
-	parserContext.popAndRegisterContainingComponent();
-	return null;
+	finally {
+		afterPrototypeCreation(beanName);
+	}
+	bean = getObjectForBeanInstance(prototypeInstance, name, beanName, mbd);
 }
 ```
+
+### beforePrototypeCreation
+
+此方法用于确保在同一时刻只能有一个此bean在初始化。
+
+### createBean
+
+和单例的是一样的，不在赘述。
+
+### afterPrototypeCreation
+
+和beforePrototypeCreation对应的，你懂的。
+
+### 总结
+
+可以看出，初始化其实和单例是一样的，只不过单例多了一个是否已经存在的检查。
+
+## 其它Scope初始化
+
+其它就指的是request、session。此部分源码:
+
+```java
+else {
+	String scopeName = mbd.getScope();
+	final Scope scope = this.scopes.get(scopeName);
+	if (scope == null) {
+		throw new IllegalStateException("No Scope registered for scope name '" + scopeName + "'");
+	}
+	Object scopedInstance = scope.get(beanName, new ObjectFactory<Object>() {
+		@Override
+		public Object getObject() throws BeansException {
+			beforePrototypeCreation(beanName);
+			try {
+				return createBean(beanName, mbd, args);
+			}
+			finally {
+				afterPrototypeCreation(beanName);
+			}
+		}
+	});
+	bean = getObjectForBeanInstance(scopedInstance, name, beanName, mbd);
+}
+```
+
+scopes是一个LinkedHashMap<String, Scope>，可以调用 ConfigurableBeanFactory定义的registerScope方法注册其值。
+
+Scope接口继承体系:
+
+![Scope继承体系](images/Scope.jpg)
+
+根据socpe.get的注释，此方法如果找到了叫做beanName的bean，那么返回，如果没有，将调用ObjectFactory创建之。Scope的实现参考类图。
 
 
 

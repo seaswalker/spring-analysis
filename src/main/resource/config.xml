@@ -15,12 +15,12 @@
         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
         http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd">    
 
-	<bean id="student" class="base.Student">
-		<property name="name" value="skywalker"></property>
-		<property name="age" value="12"></property>
-	</bean>
-	
-  	<bean class="base.SimpleBean" autowire="constructor">
-  	</bean>
+	<context:annotation-config />
+    <context:component-scan base-package="base" />
+
+    <bean class="base.Student">
+        <property name="name" value="skywalker" />
+        <property name="age" value="12" />
+    </bean>
   	
 </beans>

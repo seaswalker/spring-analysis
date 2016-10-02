@@ -1,4 +1,4 @@
-# 开头
+# ****开头
 
 入口方法在BeanDefinitionParserDelegate.parseCustomElement：
 
@@ -53,6 +53,7 @@ public BeanDefinition parse(Element element, ParserContext parserContext) {
 		parserContext.registerComponent(new BeanComponentDefinition(processorDefinition));
 	}
 	// Finally register the composite component.
+  	// 空实现
 	parserContext.popAndRegisterContainingComponent();
 	return null;
 }
@@ -194,3 +195,113 @@ rt.jar下面并没有JPA的包，所以此Processor默认是没有被注册的�
 
 ![EventListenerMethodProcessor类图](images/EventListenerMethodProcessor.jpg)
 
+### DefaultEventListenerFactory
+
+此类应该是和上面的配合使用，用以产生EventListener对象，也是从Spring4.2加入，类图:
+
+![DefaultEventListenerFactory类图](images/DefaultEventListenerFactory.jpg)
+
+## 逻辑关系整理
+
+普通的bean元素(XML)其实都有一个BeanDefinition对象与之对应，但是对于context开头的这种的特殊的元素，它所对应的一般不再是普通意义上的BeanDefinition，而是配合起来一起完成某种功能的组件(比如各种BeanPostProcessor)。这种组件Spring抽象成为ComponentDefinition接口，组件的集合表示成为CompositeComponentDefinition，类图:
+
+![CompositeComponentDefinition类图](images/CompositeComponentDefinition.jpg)
+
+最终形成的数据结构如下图:
+
+![数据结构](images/context_annotation_stack.png)
+
+不过这个数据结构貌似也没什么用，因为调用的是XmlBeanDefinitionReader中的eventListener的componentRegistered方法，然而这里的eventListener是EmptyReaderEventListener，也就是空实现。
+
+## 运行
+
+### ConfigurationClassPostProcessor
+
+本身是一个BeanFactoryPostProcessor对象，其执行入口在AbstractApplicationContext.refresh方法:
+
+```java
+invokeBeanFactoryPostProcessors(beanFactory);
+```
+
+注意，因为ConfigurationClassPostProcessor实现自BeanDefinitionRegistryPostProcessor接口，所以在此处会首先调用其postProcessBeanDefinitionRegistry方法，再调用其postProcessBeanFactory方法。
+
+#### postProcessBeanDefinitionRegistry
+
+此方法大体由两部分组成。
+
+##### BeanPostProcessor注册
+
+此部分源码:
+
+```java
+@Override
+public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) {
+	RootBeanDefinition iabpp = new RootBeanDefinition(ImportAwareBeanPostProcessor.class);
+	iabpp.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
+	registry.registerBeanDefinition(IMPORT_AWARE_PROCESSOR_BEAN_NAME, iabpp);
+	RootBeanDefinition ecbpp = new RootBeanDefinition(EnhancedConfigurationBeanPostProcessor.class);
+	ecbpp.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
+	registry.registerBeanDefinition(ENHANCED_CONFIGURATION_PROCESSOR_BEAN_NAME, ecbpp);
+}
+```
+
+###### ImportAwareBeanPostProcessor
+
+是ConfigurationClassPostProcessor的私有内部类。其类图:
+
+![ImportAwareBeanPostProcessor类图](images/ImportAwareBeanPostProcessor.jpg)
+
+此类用于处理实现了ImportAware接口的类。ImportAware接口是做什么的要从使用java源文件作为Spring配置说起:
+
+有一个类负责生成Student bean:
+
+```java
+@Configuration
+public class StudentConfig implements ImportAware {
+    @Bean
+    public Student student() {
+        Student student = new Student();
+        student.setAge(22);
+        student.setName("skywalker");
+        return student;
+    }
+    @Override
+    public void setImportMetadata(AnnotationMetadata importMetadata) {
+        System.out.println("importaware");
+    }
+}
+```
+
+生成的bean就以所在的方法名命名。还有一个类负责生成SimpleBean:
+
+```java
+@Configuration
+@Import(StudentConfig.class)
+public class SimpleBeanConfig {
+    @Autowired
+    private StudentConfig studentConfig;
+    @Bean
+    public SimpleBean getSimpleBean() {
+      	//bean依赖
+        SimpleBean simpleBean = new SimpleBean(studentConfig.student());
+        return simpleBean;
+    }
+}
+```
+
+启动代码:
+
+```java
+public static void main(String[] args) {
+	AnnotationConfigApplicationContext context = 
+		new AnnotationConfigApplicationContext(SimpleBeanConfig.class);
+	SimpleBean simpleBean = context.getBean(SimpleBean.class);
+	System.out.println(simpleBean.getStudent().getName());
+}
+```
+
+所以ImportAware接口的作用就是**使被引用的配置类可以获得引用类的相关信息**。
+
+###### EnhancedConfigurationBeanPostProcessor
+
+用于为实现了EnhancedConfiguration接口的类设置BeanFactory对象，所有的@Configuration Cglib子类均实现了此接口，为什么要这么做不太明白。

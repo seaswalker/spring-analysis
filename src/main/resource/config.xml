@@ -22,5 +22,5 @@
         <property name="name" value="skywalker" />
         <property name="age" value="12" />
     </bean>
-  	
+
 </beans>

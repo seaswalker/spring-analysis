@@ -19,8 +19,8 @@ public class SimpleBeanConfig {
     private StudentConfig studentConfig;
 
     @Bean
-    public SimpleBean getSimpleBean() {
-        SimpleBean simpleBean = new SimpleBean(studentConfig.getStudent());
+    public SimpleBean simpleBean() {
+        SimpleBean simpleBean = new SimpleBean(studentConfig.student());
         return simpleBean;
     }
 

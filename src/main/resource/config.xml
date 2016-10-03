@@ -17,9 +17,4 @@
 	<context:annotation-config />
     <context:component-scan base-package="base" />
 
-    <bean class="base.Student">
-        <property name="name" value="skywalker" />
-        <property name="age" value="12" />
-    </bean>
-
 </beans>

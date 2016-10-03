@@ -1,5 +1,7 @@
 package base;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Required;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -13,7 +15,7 @@ import javax.annotation.Resource;
 @Component("simpleBean")
 public class SimpleBean {
 
-    @Resource
+    @Autowired(required = false)
 	private Student student;
 
     public SimpleBean() {}
@@ -26,6 +28,7 @@ public class SimpleBean {
 		return student;
 	}
 
+    @Required
 	public void setStudent(Student student) {
 		this.student = student;
 	}

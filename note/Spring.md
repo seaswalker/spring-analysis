@@ -2242,6 +2242,88 @@ protected void autowireByName(
 
 autowireByType也是同样的套路，所以可以得出结论: **autowireByName和autowireByType方法只是先获取到引用的bean，真正的设值是在applyPropertyValues中进行的。**
 
+###### 初始化
+
+此处的初始化指的是bean已经构造完成，执行诸如调用其init方法的操作。相关源码:
+
+```java
+// Initialize the bean instance.
+Object exposedObject = bean;
+try {
+	populateBean(beanName, mbd, instanceWrapper);
+	if (exposedObject != null) {
+		exposedObject = initializeBean(beanName, exposedObject, mbd);
+	}
+}
+```
+
+initializeBean:
+
+```java
+protected Object initializeBean(final String beanName, final Object bean, RootBeanDefinition mbd) {
+	if (System.getSecurityManager() != null) {
+		AccessController.doPrivileged(new PrivilegedAction<Object>() {
+			@Override
+			public Object run() {
+				invokeAwareMethods(beanName, bean);
+				return null;
+			}
+		}, getAccessControlContext());
+	}
+	else {
+		invokeAwareMethods(beanName, bean);
+	}
+
+	Object wrappedBean = bean;
+	if (mbd == null || !mbd.isSynthetic()) {
+		wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, beanName);
+	}
+
+	invokeInitMethods(beanName, wrappedBean, mbd);
+
+	if (mbd == null || !mbd.isSynthetic()) {
+		wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
+	}
+	return wrappedBean;
+}
+```
+
+主要的操作步骤一目了然。
+
+- Aware方法触发:
+
+  我们的bean有可能实现了一些XXXAware接口，此处就是负责调用它们:
+
+  ```java
+  private void invokeAwareMethods(final String beanName, final Object bean) {
+  	if (bean instanceof Aware) {
+  		if (bean instanceof BeanNameAware) {
+  			((BeanNameAware) bean).setBeanName(beanName);
+  		}
+  		if (bean instanceof BeanClassLoaderAware) {
+  			((BeanClassLoaderAware) bean).setBeanClassLoader(getBeanClassLoader());
+  		}
+  		if (bean instanceof BeanFactoryAware) {
+  			((BeanFactoryAware) bean).setBeanFactory(AbstractAutowireCapableBeanFactory.this);
+  		}
+  	}
+  }
+  ```
+
+- BeanPostProcessor触发，没什么好说的
+
+- 调用init方法:
+
+  在XML配置中，bean可以有一个init-method属性来指定初始化时调用的方法。从原理来说，其实就是一个反射调用。不过注意这里有一个InitializingBean的概念。
+
+  此接口只有一个方法：
+
+  ```java
+  void afterPropertiesSet() throws Exception;
+  ```
+
+  如果我们的bean实现了此接口，那么此方法会首先被调用。此接口的意义在于: 当此bean的所有属性都被设置(注入)后，给bean一个利用现有属性重新组织或是检查属性的机会。感觉和init方法有些冲突，不过此接口在Spring被广泛使用。
+
 ### getObjectForBeanInstance
 
 位于AbstractBeanFactory，此方法的目的在于如果bean是FactoryBean，那么返回其工厂方法创建的bean，而不是自身。

@@ -1,4 +1,4 @@
-# ****开头
+# 开头
 
 入口方法在BeanDefinitionParserDelegate.parseCustomElement：
 
@@ -820,5 +820,7 @@ public class SimpleBean {
 
 ![@Required测试](images/@required_test.png)
 
+### CommonAnnotationBeanPostProcessor
 
+从其类图可以看出，此类主要是整合了MergedBeanDefinitionPostProcessor和DestructionAwareBeanPostProcessor的功能
 

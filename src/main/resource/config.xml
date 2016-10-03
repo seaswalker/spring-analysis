@@ -17,4 +17,6 @@
 	<context:annotation-config />
     <context:component-scan base-package="base" />
 
+    <bean init-method=""></bean>
+
 </beans>

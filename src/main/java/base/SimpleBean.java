@@ -1,9 +1,11 @@
 package base;
 
+import annotation.Init;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Required;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PostConstruct;
 import javax.annotation.Resource;
 
 /**
@@ -15,7 +17,7 @@ import javax.annotation.Resource;
 @Component("simpleBean")
 public class SimpleBean {
 
-    @Autowired(required = false)
+    @Autowired
 	private Student student;
 
     public SimpleBean() {}
@@ -28,7 +30,6 @@ public class SimpleBean {
 		return student;
 	}
 
-    @Required
 	public void setStudent(Student student) {
 		this.student = student;
 	}
@@ -36,5 +37,10 @@ public class SimpleBean {
 	public void send() {
 		System.out.println("I am send method from SimpleBean!");
 	}
+
+    @Init
+    public void init() {
+        System.out.println("Init!");
+    }
 	
 }

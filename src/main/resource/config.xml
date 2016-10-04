@@ -15,8 +15,15 @@
         http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd">    
 
 	<context:annotation-config />
-    <context:component-scan base-package="base" />
+    <context:component-scan base-package="base" scope-resolver="" scoped-proxy="targetClass" />
 
-    <bean init-method=""></bean>
+    <bean id="org.springframework.context.annotation.internalCommonAnnotationProcessor" class="org.springframework.context.annotation.CommonAnnotationBeanPostProcessor">
+        <property name="initAnnotationType" value="annotation.Init" />
+    </bean>
+
+    <bean id="student" class="base.Student">
+        <property name="name" value="skywalker" />
+        <property name="age" value="30" />
+    </bean>
 
 </beans>

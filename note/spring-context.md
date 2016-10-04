@@ -822,5 +822,251 @@ public class SimpleBean {
 
 ### CommonAnnotationBeanPostProcessor
 
-从其类图可以看出，此类主要是整合了MergedBeanDefinitionPostProcessor和DestructionAwareBeanPostProcessor的功能
+从其类图可以看出，此类主要是整合了MergedBeanDefinitionPostProcessor和DestructionAwareBeanPostProcessor的功能。其功能体现在以下几个方法，按调用顺序进行说明。
+
+#### postProcessMergedBeanDefinition
+
+此方法的执行入口以及调用时机上面已经说过了。其源码:
+
+```java
+@Override
+public void postProcessMergedBeanDefinition(RootBeanDefinition beanDefinition, Class<?> beanType, String 	 beanName) {
+	super.postProcessMergedBeanDefinition(beanDefinition, beanType, beanName);
+	if (beanType != null) {
+		InjectionMetadata metadata = findResourceMetadata(beanName, beanType, null);
+		metadata.checkConfigMembers(beanDefinition);
+	}
+}
+```
+
+##### 父类
+
+可以看出，首先调用了其父类InitDestroyAnnotationBeanPostProcessor的postProcessMergedBeanDefinition方法，源码:
+
+```java
+@Override
+public void postProcessMergedBeanDefinition(RootBeanDefinition beanDefinition, Class<?> beanType, String 	 beanName) {
+	if (beanType != null) {
+		LifecycleMetadata metadata = findLifecycleMetadata(beanType);
+		metadata.checkConfigMembers(beanDefinition);
+	}
+}
+```
+
+findLifecycleMetadata的套路和上面运行-AutowiredAnnotationBeanPostProcessor-源码一节中所说完全一样，所不同的是此处是**遍历所有method寻找初始化和销毁方法标记**。这两个标记很有意思，Spring允许我们自定义是哪两个标记(getter/setter方法)。子类CommonAnnotationBeanPostProcessor在构造器中设置了其值:
+
+```java
+public CommonAnnotationBeanPostProcessor() {
+	setInitAnnotationType(PostConstruct.class);
+	setDestroyAnnotationType(PreDestroy.class);
+}
+```
+
+这两个标签来自于javax.annotation包。那么怎么自定义呢?
+
+CommonAnnotationBeanPostProcessor本质上是一个BeanPostProcessor，所以我们可以自己注入，配置文件:
+
+```xml
+<bean class="org.springframework.context.annotation.CommonAnnotationBeanPostProcessor">
+	<property name="initAnnotationType" value="annotation.Init" />
+</bean>
+```
+
+Init是一个很简单的自定义注解:
+
+```java
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+public @interface Init {}
+```
+
+在自己的bean中使用此注解:
+
+```java
+@Init
+public void init() {
+	System.out.println("Init!");
+}
+```
+
+运行Spring便可以看到效果。
+
+另外注意一点，从前面annotation-config-BeanPostProcessor注册一节的源码中可以看出，**Spring在向容器中添加CommonAnnotationBeanPostProcessor时只是检测其ID(org.springframework.context.annotation.internalCommonAnnotationProcessor)是否存在，这就造成了一个问题: 如果按上面所说的配置，那么在容器中实际上有两个CommonAnnotationProcessor存在，也就是说，@PostConstruct和@PreDestroy注解此时依然被支持**。为了达到只有一个实例的目的，需要为前面的配置加上ID。
+
+##### 子类
+
+findResourceMetadata的套路还是一样，就是在属性和方法上寻找@Resource标签。
+
+#### postProcessPropertyValues
+
+源码:
+
+```java
+@Override
+public PropertyValues postProcessPropertyValues(
+		PropertyValues pvs, PropertyDescriptor[] pds, Object bean, String beanName) {
+	InjectionMetadata metadata = findResourceMetadata(beanName, bean.getClass(), pvs);
+	metadata.inject(bean, beanName, pvs);
+	return pvs;
+}
+```
+
+套路很明显了。
+
+#### postProcessBeforeInitialization
+
+实现在父类InitDestroyAnnotationBeanPostProcessor：
+
+```java
+@Override
+public Object postProcessBeforeInitialization(Object bean, String beanName) {
+	LifecycleMetadata metadata = findLifecycleMetadata(bean.getClass());
+	metadata.invokeInitMethods(bean, beanName);
+	return bean;
+}
+```
+
+invokeInitMethods:
+
+```java
+public void invokeInitMethods(Object target, String beanName) throws Throwable {
+	Collection<LifecycleElement> initMethodsToIterate =
+			(this.checkedInitMethods != null ? this.checkedInitMethods : this.initMethods);
+	if (!initMethodsToIterate.isEmpty()) {
+		for (LifecycleElement element : initMethodsToIterate) {
+          	 // 反射调用
+			element.invoke(target);
+		}
+	}
+}
+```
+
+不过从源码来看应该支持多个init方法。
+
+#### postProcessBeforeDestruction
+
+反射调用销毁方法，没啥说的了。
+
+### EventListenerMethodProcessor
+
+就一个值得关注的方法: afterSingletonsInstantiated。
+
+##### 入口
+
+DefaultListableBeanFactory.preInstantiateSingletons相关源码:
+
+```java
+// Trigger post-initialization callback for all applicable beans...
+for (String beanName : beanNames) {
+	Object singletonInstance = getSingleton(beanName);
+	if (singletonInstance instanceof SmartInitializingSingleton) {
+		final SmartInitializingSingleton smartSingleton = 
+			(SmartInitializingSingleton) singletonInstance;
+		if (System.getSecurityManager() != null) {
+			AccessController.doPrivileged(new PrivilegedAction<Object>() {
+				@Override
+				public Object run() {
+					smartSingleton.afterSingletonsInstantiated();
+					return null;
+				}
+			}, getAccessControlContext());
+		} else {
+			smartSingleton.afterSingletonsInstantiated();
+		}
+	}
+}
+```
+
+##### 源码
+
+略过。
+
+# component-scan
+
+ComponentScanBeanDefinitionParser.parse源码:
+
+```java
+@Override
+public BeanDefinition parse(Element element, ParserContext parserContext) {
+  	// base-package属性
+	String basePackage = element.getAttribute(BASE_PACKAGE_ATTRIBUTE);
+  	// 解析占位符
+	basePackage = parserContext.getReaderContext().getEnvironment()
+		.resolvePlaceholders(basePackage);
+  	//分割成数据
+	String[] basePackages = StringUtils.tokenizeToStringArray(basePackage,
+			ConfigurableApplicationContext.CONFIG_LOCATION_DELIMITERS);
+	// Actually scan for bean definitions and register them.
+	ClassPathBeanDefinitionScanner scanner = configureScanner(parserContext, element);
+	Set<BeanDefinitionHolder> beanDefinitions = scanner.doScan(basePackages);
+	registerComponents(parserContext.getReaderContext(), beanDefinitions, element);
+	return null;
+}
+```
+
+## 初始化
+
+此部分负责初始化包扫描用到的扫描器，是一个ClassPathBeanDefinitionScanner对象，configureScanner方法源码:
+
+```java
+protected ClassPathBeanDefinitionScanner configureScanner(ParserContext parserContext, Element element) {
+	boolean useDefaultFilters = true;
+	if (element.hasAttribute(USE_DEFAULT_FILTERS_ATTRIBUTE)) {
+		useDefaultFilters = Boolean.valueOf(element.getAttribute(USE_DEFAULT_FILTERS_ATTRIBUTE));
+	}
+
+	// Delegate bean definition registration to scanner class.
+	ClassPathBeanDefinitionScanner scanner = createScanner
+		(parserContext.getReaderContext(), useDefaultFilters);
+	scanner.setResourceLoader(parserContext.getReaderContext().getResourceLoader());
+	scanner.setEnvironment(parserContext.getReaderContext().getEnvironment());
+	scanner.setBeanDefinitionDefaults(parserContext.getDelegate().getBeanDefinitionDefaults());
+	scanner.setAutowireCandidatePatterns(parserContext.getDelegate().getAutowireCandidatePatterns());
+
+	if (element.hasAttribute(RESOURCE_PATTERN_ATTRIBUTE)) {
+		scanner.setResourcePattern(element.getAttribute(RESOURCE_PATTERN_ATTRIBUTE));
+	}
+		
+	parseBeanNameGenerator(element, scanner);
+
+	parseScope(element, scanner);
+
+	parseTypeFilters(element, scanner, parserContext);
+	return scanner;
+}
+```
+
+下面开始按顺序分部分说明。
+
+### use-default-filters
+
+component-scan注解会默认扫描喜闻乐见的@Component、@Repository、@Service和@Controller四大金刚。如果此属性设为false，那么就不会扫描这几个属性。
+
+### 扫描器:创建 & 初始化
+
+就是createScanner方法和下面那一坨setter方法，没啥好说的。
+
+### resource-pattern
+
+用以配置扫描器扫描的路径，默认`**/*.class`。
+
+### name-generator
+
+可以指定命名策略，这个在前面运行-ConfigurationClassPostProcessor-类解析一节中说过。Spring在parseBeanNameGenerator方法会直接使用反射的方法生成其对象。
+
+### scope-resolver
+
+指定使用的ScopeMetadataResolver。此接口用于解析bean的scope定义，其类图:
+
+![ScopeMetadataResolver类图](images/ScopeMetadataResolver.jpg)
+
+默认是AnnotationScopeMetadataResolver，也就是解析@Scope标签。
+
+### scoped-proxy
+
+此配置的意思应该是是否为检测到的bean生成代理子类，共有三个选项: interfaces, no, targetClasses，默认no。原理应该就像对@Configuration类的处理，Spring自己说是实现proxy style，不知所云。
+
+
+
+
 

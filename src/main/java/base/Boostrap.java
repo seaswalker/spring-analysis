@@ -1,5 +1,6 @@
 package base;
 
+import org.springframework.context.annotation.CommonAnnotationBeanPostProcessor;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
 import java.util.Arrays;
@@ -11,6 +12,7 @@ public class Boostrap {
 		SimpleBean bean = SimpleBean.class.cast(context.getBean("simpleBean"));
 		System.out.println(bean.getStudent().getName());
         System.out.println(Arrays.toString(context.getBeanDefinitionNames()));
+        System.out.println(Arrays.toString(context.getBeanNamesForType(CommonAnnotationBeanPostProcessor.class)));
         context.close();
 	}
 	

@@ -3,6 +3,8 @@ package base;
 import annotation.Init;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Required;
+import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.context.annotation.*;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -15,6 +17,7 @@ import javax.annotation.Resource;
  *
  */
 @Component("simpleBean")
+@Scope(value = "singleton", proxyMode = ScopedProxyMode.TARGET_CLASS)
 public class SimpleBean {
 
     @Autowired

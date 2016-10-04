@@ -1066,7 +1066,360 @@ component-scan注解会默认扫描喜闻乐见的@Component、@Repository、@Se
 
 此配置的意思应该是是否为检测到的bean生成代理子类，共有三个选项: interfaces, no, targetClasses，默认no。原理应该就像对@Configuration类的处理，Spring自己说是实现proxy style，不知所云。
 
+### exclude-filter/include-filter
 
+用法示例:
+
+```xml
+<context:component-scan base-package="base">
+	<context:exclude-filter type="annotation" expression="javax.annotation.Resource" />
+</context:component-scan>
+```
+
+parseTypeFilters方法负责此部分的解析，只贴部分源码:
+
+```java
+if (INCLUDE_FILTER_ELEMENT.equals(localName)) {
+	TypeFilter typeFilter = createTypeFilter((Element) node, classLoader, parserContext);
+	scanner.addIncludeFilter(typeFilter);
+} else if (EXCLUDE_FILTER_ELEMENT.equals(localName)) {
+	TypeFilter typeFilter = createTypeFilter((Element) node, classLoader, parserContext);
+	scanner.addExcludeFilter(typeFilter);
+}
+```
+
+## 扫描
+
+入口方法便是ClassPathBeanDefinitionScanner.doScan:
+
+```java
+protected Set<BeanDefinitionHolder> doScan(String... basePackages) {
+	Assert.notEmpty(basePackages, "At least one base package must be specified");
+	Set<BeanDefinitionHolder> beanDefinitions = new LinkedHashSet<BeanDefinitionHolder>();
+	for (String basePackage : basePackages) {
+      	 // 逐包扫描
+		Set<BeanDefinition> candidates = findCandidateComponents(basePackage);
+		for (BeanDefinition candidate : candidates) {
+			ScopeMetadata scopeMetadata = this.scopeMetadataResolver.resolveScopeMetadata(candidate);
+			candidate.setScope(scopeMetadata.getScopeName());
+			String beanName = this.beanNameGenerator.generateBeanName(candidate, this.registry);
+			if (candidate instanceof AbstractBeanDefinition) {
+              	 // 为BeanDefinition设置默认的属性
+				postProcessBeanDefinition((AbstractBeanDefinition) candidate, beanName);
+			}
+			if (candidate instanceof AnnotatedBeanDefinition) {
+				AnnotationConfigUtils.processCommonDefinitionAnnotations
+					((AnnotatedBeanDefinition) candidate);
+			}
+			if (checkCandidate(beanName, candidate)) {
+				BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(candidate, beanName);
+				definitionHolder = AnnotationConfigUtils.applyScopedProxyMode
+					(scopeMetadata, definitionHolder, this.registry);
+				beanDefinitions.add(definitionHolder);
+				registerBeanDefinition(definitionHolder, this.registry);
+			}
+		}
+	}
+	return beanDefinitions;
+}
+```
+
+### 逐包扫描/BeanDefinition解析
+
+扫描其实就是在classpath下直接读取class文件。读取到的class文件被Spring用Resource接口表示。之后交由MetadataReader进行解析，其类图:
+
+![MetadataReader类图](images/MetadataReader.jpg)
+
+对class文件的读取、分析是通过ASM完成的，入口在SimpleMetadataReader的构造器:
+
+```java
+SimpleMetadataReader(Resource resource, ClassLoader classLoader) throws IOException {
+	InputStream is = new BufferedInputStream(resource.getInputStream());
+	ClassReader classReader;
+	classReader = new ClassReader(is);
+
+	AnnotationMetadataReadingVisitor visitor = new AnnotationMetadataReadingVisitor(classLoader);
+	classReader.accept(visitor, ClassReader.SKIP_DEBUG);
+
+	this.annotationMetadata = visitor;
+	// (since AnnotationMetadataReadingVisitor extends ClassMetadataReadingVisitor)
+	this.classMetadata = visitor;
+	this.resource = resource;
+}
+```
+
+解析的关键便在于AnnotationMetadataReadingVisitor，其类图:
+
+![AnnotationMetadataReadingVisitor类图](images/AnnotationMetadataReadingVisitor.jpg)
+
+核心在于其visitAnnotation方法:
+
+```java
+@Override
+public AnnotationVisitor visitAnnotation(final String desc, boolean visible) {
+	String className = Type.getType(desc).getClassName();
+	this.annotationSet.add(className);
+	return new AnnotationAttributesReadingVisitor(
+		className, this.attributesMap, this.metaAnnotationMap, this.classLoader);
+}
+```
+
+返回一个AnnotationVisitor表示对此注解的属性感兴趣，用于解析其属性。最终得到的BeanDefinition集合是ScannedGenericBeanDefinition类型，其类图:
+
+![ScannedGenericBeanDefinition类图](images/ScannedGenericBeanDefinition.jpg)
+
+### @Scope解析
+
+AnnotationScopeMetadataResolver.resolveScopeMetadata:
+
+```java
+@Override
+public ScopeMetadata resolveScopeMetadata(BeanDefinition definition) {
+	ScopeMetadata metadata = new ScopeMetadata();
+	if (definition instanceof AnnotatedBeanDefinition) {
+		AnnotatedBeanDefinition annDef = (AnnotatedBeanDefinition) definition;
+      	 // 寻找Scope相关的属性，AnnotationAttributes是LinkedHashMap的子类
+		AnnotationAttributes attributes = AnnotationConfigUtils.attributesFor(
+				annDef.getMetadata(), this.scopeAnnotationType);
+		if (attributes != null) {
+          	 // @Scope值
+			metadata.setScopeName(attributes.getString("value"));
+			ScopedProxyMode proxyMode = attributes.getEnum("proxyMode");
+			if (proxyMode == null || proxyMode == ScopedProxyMode.DEFAULT) {
+				proxyMode = this.defaultProxyMode;
+			}
+			metadata.setScopedProxyMode(proxyMode);
+		}
+	}
+	return metadata;
+}
+```
+
+proxyMode和xml的scoped-proxy属性是一个概念:
+
+```java
+@Scope(value = "singleton", proxyMode = ScopedProxyMode.DEFAULT)
+```
+
+**XML的属性是全局的配置，这个是局部(针对单个bean)的配置**，和XML属性相比对了一个default选项，这个就表示使用XML属性的配置。
+
+### bean名字生成
+
+AnnotationBeanNameGenerator.generateBeanName:
+
+```java
+@Override
+public String generateBeanName(BeanDefinition definition, BeanDefinitionRegistry registry) {
+	if (definition instanceof AnnotatedBeanDefinition) {
+		String beanName = determineBeanNameFromAnnotation((AnnotatedBeanDefinition) definition);
+		if (StringUtils.hasText(beanName)) {
+			// Explicit bean name found.
+			return beanName;
+		}
+	}
+	// Fallback: generate a unique default bean name.
+	return buildDefaultBeanName(definition, registry);
+}
+```
+
+#### 根据注解
+
+默认会首先尝试根据@Component、@Service、@Controller、@Repository、@ManagedBean、@Named的value属性生成，determineBeanNameFromAnnotation:
+
+```java
+protected String determineBeanNameFromAnnotation(AnnotatedBeanDefinition annotatedDef) {
+	AnnotationMetadata amd = annotatedDef.getMetadata();
+	Set<String> types = amd.getAnnotationTypes();
+	String beanName = null;
+  	 // 遍历当前bean拥有的所有类级注解
+	for (String type : types) {
+      	 // 获取此注解所有的属性
+		AnnotationAttributes attributes = AnnotationConfigUtils.attributesFor(amd, type);
+		if (isStereotypeWithNameValue(type, amd.getMetaAnnotationTypes(type), attributes)) {
+			Object value = attributes.get("value");
+			if (value instanceof String) {
+				String strVal = (String) value;
+				if (StringUtils.hasLength(strVal)) {
+					if (beanName != null && !strVal.equals(beanName)) {
+						throw new IllegalStateException();
+					}
+					beanName = strVal;
+				}
+			}
+		}
+	}
+	return beanName;
+}
+```
+
+isStereotypeWithNameValue方法用于判断此注解是否可以用来生成beanName，比如@Scope便不适合:
+
+```java
+protected boolean isStereotypeWithNameValue(String annotationType,
+		Set<String> metaAnnotationTypes, Map<String, Object> attributes) {
+  	// org.springframework.stereotype.Component
+	boolean isStereotype = annotationType.equals(COMPONENT_ANNOTATION_CLASSNAME) ||
+		(metaAnnotationTypes != null && metaAnnotationTypes.contains(COMPONENT_ANNOTATION_CLASSNAME)) ||
+		annotationType.equals("javax.annotation.ManagedBean") ||
+		annotationType.equals("javax.inject.Named");
+	return (isStereotype && attributes != null && attributes.containsKey("value"));
+}
+```
+
+metaAnnotationTypes用以判断元注解，针对这种情况:
+
+```java
+@Component
+public @interface Controller {}
+```
+
+可以看出，判断是否可以用来生成名字的依据便是注解类型是否在上面提到的6种之列并且value属性不为空。
+
+#### 默认策略
+
+如果上面提到的条件不满足，那么便会用默认策略生成beanName，buildDefaultBeanName：
+
+```java
+protected String buildDefaultBeanName(BeanDefinition definition) {
+  	// base.SimpleBean -> SimpleBean
+	String shortClassName = ClassUtils.getShortName(definition.getBeanClassName());
+  	//SimpleBean -> simpleBean
+	return Introspector.decapitalize(shortClassName);
+}
+```
+
+注意，对于内部类: OuterClassName.InnerClassName -> outerClassName.InnerClassName.
+
+### 其它注解解析
+
+入口在AnnotationConfigUtils.processCommonDefinitionAnnotations，其它指的是这几个:
+
+```java
+@Lazy
+@Primary
+@DependsOn("student")
+@Role(BeanDefinition.ROLE_APPLICATION)
+@Description("This is a simple bean.")
+public class SimpleBean {}
+```
+
+这里面就是@Role没见过，默认就是上面那个值，Spring说这是一个"hint"，可能没啥卵用，希望不要被打脸。解析之后设置到BeanDefinition，没啥好说的。
+
+### 冲突检测
+
+Spring会检测容器中是否已经存在同名的BeanDefinition。ClassPathBeanDefinitionScanner.checkCandidate:
+
+```java
+protected boolean checkCandidate(String beanName, BeanDefinition beanDefinition) {
+  	// 没有同名的，直接返回
+	if (!this.registry.containsBeanDefinition(beanName)) {
+		return true;
+	}
+	BeanDefinition existingDef = this.registry.getBeanDefinition(beanName);
+	BeanDefinition originatingDef = existingDef.getOriginatingBeanDefinition();
+	if (originatingDef != null) {
+		existingDef = originatingDef;
+	}
+	if (isCompatible(beanDefinition, existingDef)) {
+		return false;
+	}
+	throw new ConflictingBeanDefinitionException("冲突啦!");
+}
+```
+
+isCompatible用于判断和之前的BeanDefinition是否兼容:
+
+```java
+protected boolean isCompatible(BeanDefinition newDefinition, BeanDefinition existingDefinition) {
+	//// explicitly registered overriding bean
+	return (!(existingDefinition instanceof ScannedGenericBeanDefinition) || 
+			//// scanned same file twice
+			newDefinition.getSource().equals(existingDefinition.getSource()) || 
+			// scanned equivalent class twice			
+			newDefinition.equals(existingDefinition));  
+}
+```
+
+可以看出，**如果已经存在的BeanDefinition不是扫描来的，如果是由同一个class文件解析来的，如果两者equals，Spring都认为是兼容的，即Spring会用新的替换之前的。**
+
+### 代理生成
+
+入口: ClassPathBeanDefinitionScanner.doScan:
+
+```java
+BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(candidate, beanName);
+definitionHolder = AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
+```
+
+AnnotationConfigUtils.applyScopedProxyMode:
+
+```java
+static BeanDefinitionHolder applyScopedProxyMode(
+		ScopeMetadata metadata, BeanDefinitionHolder definition, BeanDefinitionRegistry registry) {
+	ScopedProxyMode scopedProxyMode = metadata.getScopedProxyMode();
+  	// 基本都是从这里跑了
+	if (scopedProxyMode.equals(ScopedProxyMode.NO)) {
+		return definition;
+	}
+	boolean proxyTargetClass = scopedProxyMode.equals(ScopedProxyMode.TARGET_CLASS);
+	return ScopedProxyCreator.createScopedProxy(definition, registry, proxyTargetClass);
+}
+```
+
+最终调用的是ScopedProxyUtils.createScopedProxy，源码很多，这里说下重点:
+
+- 这里所做的是生成了一个新的BeanDefinition对象，作为代理者，其属性拷贝自被代理者，代理者的beanClass为ScopedProxyFactoryBean，代理者的名字设置为被代理者的名字，而被代理者的名字改为scopedTarget.原名字，代理者内部有一个targetBeanName属性，就是被代理者的名字。
+- 被代理者的autowireCandidate和primary属性被设为false，不能再当作其它bean的注入候选者。
+- 将被代理者以scopedTarget.原名字注册到容器，返回代理者。
+- 代理者和被代理者同时存在于容器中。
+
+可以看出，这其实是一个偷天换日的过程。
+
+做个实验:
+
+```java
+public class Boostrap {
+	public static void main(String[] args) {
+		ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("config.xml");
+		SimpleBean bean = SimpleBean.class.cast(context.getBean(SimpleBean.class));
+         System.out.println(bean.getClass().getName());
+         context.close();
+	}
+}
+```
+
+SimpleBean已开启代理，输出的结果:
+
+```html
+base.SimpleBean$$EnhancerBySpringCGLIB$$27256c61
+```
+
+那么问题来了，对于以class寻找的方式，必定会找到两个，那么怎么做出选择呢?
+
+DefaultListableBeanFactory.getBean(Class<T> requiredType, Object... args)部分源码:
+
+```java
+String[] beanNames = getBeanNamesForType(requiredType);
+//不止一个满足条件(代理者和被代理者)
+if (beanNames.length > 1) {
+	ArrayList<String> autowireCandidates = new ArrayList<String>();
+	for (String beanName : beanNames) {
+      	 // here
+		if (!containsBeanDefinition(beanName) || getBeanDefinition(beanName).isAutowireCandidate()) {
+			autowireCandidates.add(beanName);
+		}
+	}
+	if (autowireCandidates.size() > 0) {
+		beanNames = autowireCandidates.toArray(new String[autowireCandidates.size()]);
+	}
+}
+```
+
+可以看出，是上面提到过的autowireCandidate设为了false的缘故导致了被代理者被pass。
+
+### BeanDefinition注册
+
+你懂的。
 
 
 

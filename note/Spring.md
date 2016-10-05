@@ -2242,6 +2242,10 @@ protected void autowireByName(
 
 autowireByType也是同样的套路，所以可以得出结论: **autowireByName和autowireByType方法只是先获取到引用的bean，真正的设值是在applyPropertyValues中进行的。**
 
+###### 属性设置
+
+Spring判断一个属性可不可以被设置(存不存在)是通过java bean的内省操作来完成的，也就是说，属性可以被设置的条件是**此属性拥有public的setter方法，并且注入时的属性名应该是setter的名字**。
+
 ###### 初始化
 
 此处的初始化指的是bean已经构造完成，执行诸如调用其init方法的操作。相关源码:

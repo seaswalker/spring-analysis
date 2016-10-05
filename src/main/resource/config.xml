@@ -9,21 +9,23 @@
     xsi:schemaLocation="    
         http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.0.xsd  
         http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd  
-        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd  
+        http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
         http://www.springframework.org/schema/jee http://www.springframework.org/schema/jee/spring-jee-4.0.xsd  
         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
-        http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd">    
+        http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd">
 
-	<context:annotation-config />
     <context:component-scan base-package="base" />
+
+    <context:property-placeholder location="property.properties" trim-values="false" />
 
     <bean id="org.springframework.context.annotation.internalCommonAnnotationProcessor" class="org.springframework.context.annotation.CommonAnnotationBeanPostProcessor">
         <property name="initAnnotationType" value="annotation.Init" />
     </bean>
 
     <bean id="student" class="base.Student">
-        <property name="name" value="skywalker" />
-        <property name="age" value="30" />
+        <property name="name" value="${student.name:王八}" />
+        <property name="age" value="${student.age}" />
+        <property name="id" value="${student.id}" />
     </bean>
 
 </beans>

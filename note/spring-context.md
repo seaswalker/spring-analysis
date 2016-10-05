@@ -1088,6 +1088,10 @@ if (INCLUDE_FILTER_ELEMENT.equals(localName)) {
 }
 ```
 
+### annotation-config
+
+此属性等同于<context:annotation-config />配置，默认就是true，也就是说，如果配置了context:component-scan其实就没有必要配置annotation-config 了。
+
 ## 扫描
 
 入口方法便是ClassPathBeanDefinitionScanner.doScan:
@@ -1421,5 +1425,335 @@ if (beanNames.length > 1) {
 
 你懂的。
 
+## Component注册
 
+套路和annotation-config-逻辑关系整理一节完全一样，不再赘述。
+
+# property-override
+
+## 作用
+
+允许我们使用属性文件(.properties)的形式对bean的属性进行替换。下面是一个简单的demo:
+
+定义如下的属性文件(property.properties):
+
+```properties
+student.name=dog
+```
+
+格式为: bean名字.属性名字=值。由如下的bean:
+
+```xml
+<bean id="student" class="base.Student">
+	<property name="name" value="skywalker" />
+	<property name="age" value="30" />
+</bean>
+```
+
+进行如下的配置:
+
+```xml
+<context:property-override location="property.properties" />
+```
+
+运行如下的代码:
+
+```java
+public static void main(String[] args) {
+	ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("config.xml");
+	SimpleBean bean = SimpleBean.class.cast(context.getBean(SimpleBean.class));
+	System.out.println(bean.getStudent().getName());
+	context.close();
+}
+```
+
+打印的便是dog，而不是skywalker。
+
+## 类图
+
+具体的实现类是PropertyOverrideBeanDefinitionParser，其类图如下:
+
+![PropertyOverrideBeanDefinitionParser类图](images/PropertyOverrideBeanDefinitionParser.jpg)
+
+## 解析
+
+解析的原理是将此配置相关的信息保存到BeanDefinition中，更准确的说是一个GenericBeanDefinition。解析的源码: 
+
+AbstractPropertyLoadingBeanDefinitionParser.doParse:
+
+```java
+@Override
+protected void doParse(Element element, BeanDefinitionBuilder builder) {
+	String location = element.getAttribute("location");
+	if (StringUtils.hasLength(location)) {
+		String[] locations = StringUtils.commaDelimitedListToStringArray(location);
+		builder.addPropertyValue("locations", locations);
+	}
+	String propertiesRef = element.getAttribute("properties-ref");
+	if (StringUtils.hasLength(propertiesRef)) {
+		builder.addPropertyReference("properties", propertiesRef);
+	}
+	String fileEncoding = element.getAttribute("file-encoding");
+	if (StringUtils.hasLength(fileEncoding)) {
+		builder.addPropertyValue("fileEncoding", fileEncoding);
+	}
+	String order = element.getAttribute("order");
+	if (StringUtils.hasLength(order)) {
+		builder.addPropertyValue("order", Integer.valueOf(order));
+	}
+	builder.addPropertyValue("ignoreResourceNotFound",
+			Boolean.valueOf(element.getAttribute("ignore-resource-not-found")));
+	builder.addPropertyValue("localOverride",
+			Boolean.valueOf(element.getAttribute("local-override")));
+	builder.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
+}
+```
+
+### properties-ref
+
+此属性允许我们直接引用一个java.util.Properties类型的bean作为数据源，示例:
+
+```xml
+<context:property-override  properties-ref="property" />
+    
+<bean id="property" class="java.util.Properties">
+	<constructor-arg>
+    	<props>
+        	<prop key="student.name">cat</prop>
+		</props>
+	</constructor-arg>
+</bean>
+```
+
+这样便可以看到结果。
+
+### order
+
+此属性用以指定其优先级，假设配置了多个context:property-override并且里面有相同的字段，那么将依赖order决定结果。
+
+### ignore-resource-not-found
+
+如果设为true，那么对于没有找到的属性文件将会忽略，否则会抛出异常，默认为false，抛异常。
+
+### ignore-unresolvable
+
+如果设为true，那么对于没有找到对应的key将会忽略，否则抛出异常，默认false。
+
+### local-override
+
+这个属性让我很迷惑。Spring说是此选项决定"local"的属性是否可以覆盖属性文件中的值。正如下面说的，实际上属性文件被解析到了PropertyOverrideConfigurer对象，其父类PropertiesLoaderSupport有一个字段:
+
+```java
+protected Properties[] localProperties;
+
+/**
+ * Set local properties, e.g. via the "props" tag in XML bean definitions.
+ * These can be considered defaults, to be overridden by properties
+ * loaded from files.
+ */
+public void setProperties(Properties properties) {
+	this.localProperties = new Properties[] {properties};
+}
+```
+
+可以看出，这应该就是Spring所说的"local"属性。好，我们来注入一下:
+
+```xml
+<context:property-override  location="property.properties" local-override="false" />
+
+<bean class="org.springframework.beans.factory.config.PropertyOverrideConfigurer">
+	<property name="properties">
+		<array>
+			<props>
+				<prop key="student.name">cat</prop>
+			</props>
+		</array>
+	</property>
+</bean>
+```
+
+然而Spring在注册PropertyOverrideConfigurer的时候根本没有检查容器中是否已经有此类型的BeanDefinition存在，这就导致容器中会同时存在两个!在此种情况下local-override根本没什么卵用，因为后面的PropertyOverrideConfigurer始终会覆盖前一个，local-override是针对一个PropertyOverrideConfigurer来说的，那么问题来了，除此之外如何通过XML向"local"注入?(context:property-override不允许子标签存在)
+
+### BeanDefinition
+
+保存的BeanDefinition的beanClass为PropertyOverrideConfigurer，其类图:
+
+![PropertyOverrideConfigurer类图](images/PropertyOverrideConfigurer.jpg)
+
+## 运行
+
+入口当然是BeanFactoryPostProcessor.postProcessBeanFactory(PropertyResourceConfigurer):
+
+```java
+@Override
+public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) {
+	try {
+      	 // 属性加载
+		Properties mergedProps = mergeProperties();
+
+		// Convert the merged properties, if necessary.
+		convertProperties(mergedProps);
+
+		// Let the subclass process the properties.
+		processProperties(beanFactory, mergedProps);
+	}
+	catch (IOException ex) {
+		throw new BeanInitializationException("Could not load properties", ex);
+	}
+}
+```
+
+### 属性加载
+
+PropertiesLoaderSupport.mergeProperties:
+
+```java
+protected Properties mergeProperties() throws IOException {
+	Properties result = new Properties();
+	if (this.localOverride) {
+		// Load properties from file upfront, to let local properties override.
+		loadProperties(result);
+	}
+	if (this.localProperties != null) {
+		for (Properties localProp : this.localProperties) {
+			CollectionUtils.mergePropertiesIntoMap(localProp, result);
+		}
+	}
+	if (!this.localOverride) {
+		// Load properties from file afterwards, to let those properties override.
+		loadProperties(result);
+	}
+	return result;
+}
+```
+
+可以看出，对local-override的支持是通过改变local和文件两者的加载顺序来实现的。
+
+### 属性转换
+
+convertProperties是个空实现，因为这里并不需要，在bean实际生成的时候才会转换。
+
+### 属性设置
+
+就是逐个属性调用PropertyOverrideConfigurer.applyPropertyValue:
+
+```java
+protected void applyPropertyValue(
+		ConfigurableListableBeanFactory factory, String beanName, String property, String value) {
+
+	BeanDefinition bd = factory.getBeanDefinition(beanName);
+	while (bd.getOriginatingBeanDefinition() != null) {
+		bd = bd.getOriginatingBeanDefinition();
+	}
+	PropertyValue pv = new PropertyValue(property, value);
+	pv.setOptional(this.ignoreInvalidKeys);
+	bd.getPropertyValues().addPropertyValue(pv);
+}
+```
+
+addPropertyValue会遍历PropertyValue链表，找到name相同的进行value替换。
+
+# property-placeholder
+
+这个怎么用已经喜闻乐见了
+
+## 解析
+
+解析的实现类是PropertyPlaceholderBeanDefinitionParser，此类的父类继承体系和property-override的PropertyOverrideBeanDefinitionParser完全一样，所以整体的处理套路也是基本一致。为什么会一致呢，查看此配置拥有的属性就会发现，和property-override很多都是一样的，所以这里只对不一样的而进行说明。
+
+PropertyPlaceholderBeanDefinitionParser.doParse:
+
+```java
+@Override
+protected void doParse(Element element, BeanDefinitionBuilder builder) {
+	super.doParse(element, builder);
+	builder.addPropertyValue("ignoreUnresolvablePlaceholders",
+			Boolean.valueOf(element.getAttribute("ignore-unresolvable")));
+	String systemPropertiesModeName = element.getAttribute(SYSTEM_PROPERTIES_MODE_ATTRIBUTE);
+	if (StringUtils.hasLength(systemPropertiesModeName) &&
+			!systemPropertiesModeName.equals(SYSTEM_PROPERTIES_MODE_DEFAULT)) {
+		builder.addPropertyValue("systemPropertiesModeName", "SYSTEM_PROPERTIES_MODE_"
+			+ systemPropertiesModeName);
+	}
+	if (element.hasAttribute("value-separator")) {
+		builder.addPropertyValue("valueSeparator", element.getAttribute("value-separator"));
+	}
+	if (element.hasAttribute("trim-values")) {
+		builder.addPropertyValue("trimValues", element.getAttribute("trim-values"));
+	}
+	if (element.hasAttribute("null-value")) {
+		builder.addPropertyValue("nullValue", element.getAttribute("null-value"));
+	}
+}
+```
+
+### system-properties-mode
+
+Spring会将java的System.getProperties也当做属性的来源，此配置用于设置系统的和本地文件的同名属性的覆盖方式(谁覆盖谁)，自己看文档去。
+
+### value-separator
+
+用于配置默认的值的分隔符:
+
+```xml
+<bean id="student" class="base.Student">
+	<property name="name" value="${student.name:skywalker}" />
+</bean>
+```
+
+如果属性文件里没有student.name，那么就是skywalker。默认就是:。
+
+### null-value
+
+遇到哪些值应该当做空处理，比如可以把空串""设为这个，默认不对任何值进行处理。
+
+### trim-values
+
+是否移除开头和结尾的空格，按理说应该是布尔值，但是Spring没有提供可以选择的值，经过测试发现设为true或是false都会把空格干掉，不知道什么鬼。
+
+### BeanDefinition
+
+这次是PropertySourcesPlaceholderConfigurer，其类图:
+
+![PropertySourcesPlaceholderConfigurer类图](images/PropertySourcesPlaceholderConfigurer.jpg)
+
+## 运行
+
+PropertySourcesPlaceholderConfigurer.postProcessBeanFactory：
+
+```java
+@Override
+public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
+	if (this.propertySources == null) {
+		this.propertySources = new MutablePropertySources();
+		if (this.environment != null) {
+			this.propertySources.addLast(
+				new PropertySource<Environment>(ENVIRONMENT_PROPERTIES_PROPERTY_SOURCE_NAME, 
+					this.environment) {
+					@Override
+					public String getProperty(String key) {
+						return this.source.getProperty(key);
+					}
+				}
+			);
+		}
+		PropertySource<?> localPropertySource =
+				new PropertiesPropertySource(LOCAL_PROPERTIES_PROPERTY_SOURCE_NAME, mergeProperties());
+		if (this.localOverride) {
+			this.propertySources.addFirst(localPropertySource);
+		}
+		else {
+			this.propertySources.addLast(localPropertySource);
+		}
+	}
+	processProperties(beanFactory, new PropertySourcesPropertyResolver(this.propertySources));
+	this.appliedPropertySources = this.propertySources;
+}
+```
+
+从源码中可以看出，如果其内部的propertySources属性不为空(当然默认是空)，那么属性文件和系统属性都会被忽略。它的使用场景应该是这样:
+
+不使用property-placeholder标签，以显式的bean定义代替。
+
+### 处理
 

@@ -1,8 +1,11 @@
 package base;
 
 import annotation.Init;
+import org.springframework.beans.factory.annotation.Autowire;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Configurable;
 import org.springframework.beans.factory.annotation.Required;
+import org.springframework.beans.factory.aspectj.ConfigurableObject;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.*;
 import org.springframework.stereotype.Component;
@@ -16,9 +19,8 @@ import javax.annotation.Resource;
  * @author skywalker
  *
  */
-@Component("simpleBean")
-@Scope(value = "singleton", proxyMode = ScopedProxyMode.TARGET_CLASS)
-public class SimpleBean {
+@Configurable(autowire = Autowire.BY_NAME)
+public class SimpleBean implements ConfigurableObject {
 
     @Autowired
 	private Student student;

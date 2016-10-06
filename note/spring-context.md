@@ -1757,3 +1757,180 @@ public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) 
 
 ### 处理
 
+处理的过程就是遍历全部BeanDefinition，替换${}，不再详细进行详细说明。
+
+# load-time-weaver & spring-configured
+
+这两个配置是紧密相关的，所以在一起说了。
+
+load-time-weaver用以开启aspectj类加载期织入，实际上是利用jdk1.6提供的instrument API实现的，原理就是jvm会在类加载之前将class暴露给我们制定的类，允许我们在此时对类进行修改。aspectj便利用此机会根据我们的配置生成对应的满足需求的子类。
+
+可以参考:
+
+[Spring之LoadTimeWeaver——一个需求引发的思考](http://sexycoding.iteye.com/blog/1062372)
+
+[Spring LoadTimeWeaver 的那些事儿](http://www.iteye.com/topic/481813)
+
+## javaagent
+
+要想使用此功能需要配置jvm参数javaagent指定代理类的jar包，示例:
+
+-javaagent:D:\Software\maven-repos\org\springframework\spring-agent\2.5.6.SEC03\spring-agent-2.5.6.SEC03.jar
+
+此jar包的META-INF/MANIFEST.MF文件需要配置如下一行:
+
+Premain-Class: org.springframework.instrument.InstrumentationSavingAge
+ nt
+
+Spring的这个jar包只有这一个类，premain方法便是jvm调用的入口，方法参数是固定的。源码:
+
+```java
+public class InstrumentationSavingAgent {
+
+	private static volatile Instrumentation instrumentation;
+
+	public static void premain(String agentArgs, Instrumentation inst) {
+		instrumentation = inst;
+	}
+
+	public static Instrumentation getInstrumentation() {
+		return instrumentation;
+	}
+}	
+```
+
+所以，Spring在这里把Instrumentation给暴露了出来，供其它的类使用。
+
+## 解析
+
+解析的实现类是LoadTimeWeaverBeanDefinitionParser，其继承体系和property-override的PropertyOverrideBeanDefinitionParser类似。
+
+LoadTimeWeaverBeanDefinitionParser.doParse:
+
+```java
+@Override
+protected void doParse(Element element, ParserContext parserContext, BeanDefinitionBuilder builder) {
+	builder.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
+	if (isAspectJWeavingEnabled(element.getAttribute(ASPECTJ_WEAVING_ATTRIBUTE), parserContext)) {
+		if (!parserContext.getRegistry().containsBeanDefinition(ASPECTJ_WEAVING_ENABLER_BEAN_NAME)) {
+			RootBeanDefinition def = new RootBeanDefinition(ASPECTJ_WEAVING_ENABLER_CLASS_NAME);
+			parserContext.registerBeanComponent(
+					new BeanComponentDefinition(def, ASPECTJ_WEAVING_ENABLER_BEAN_NAME));
+		}
+		if (isBeanConfigurerAspectEnabled(parserContext.getReaderContext().getBeanClassLoader())) {
+			new SpringConfiguredBeanDefinitionParser().parse(element, parserContext);
+		}
+	}
+}
+```
+
+### aspectj-weaving
+
+这里便是加载其织入的开关，共有三个选项: on, off, autodect。前两个自不必说，autodect表示自动去检测/META-INF下是否存在aop.xml，如果有，那么开启。
+
+此功能依赖于spring-aspectj包，此jar包下有aop.xml，所以autodect也是开启的。
+
+### 是否开启
+
+isAspectJWeavingEnabled方法用于判断是否启用:
+
+```java
+protected boolean isAspectJWeavingEnabled(String value, ParserContext parserContext) {
+	if ("on".equals(value)) {
+		return true;
+	} else if ("off".equals(value)) {
+		return false;
+	} else {
+		// 寻找aop.xml
+		ClassLoader cl = parserContext.getReaderContext().getResourceLoader().getClassLoader();
+		return (cl.getResource(AspectJWeavingEnabler.ASPECTJ_AOP_XML_RESOURCE) != null);
+	}
+}
+```
+
+### AspectJWeavingEnabler
+
+从源码中可以看出，Spring向容器放了一个这东西，名字叫org.springframework.context.config.internalAspectJWeavingEnabler。这东西用来向LoadTimeWeaver设置aspectj的ClassPreProcessorAgentAdapter对象。其类图:
+
+![AspectJWeavingEnabler类图](images/AspectJWeavingEnabler.jpg)
+
+### SpringConfiguredBeanDefinitionParser
+
+如果isBeanConfigurerAspectEnabled方法返回true，那么将会生成一个此对象并调用其parse方法，查看ContextNamespaceHandler的init方法源码可以发现，spring-configured对应的解析器其实就是它:
+
+```java
+registerBeanDefinitionParser("spring-configured", new SpringConfiguredBeanDefinitionParser());
+```
+
+其parse方法:
+
+```java
+@Override
+public BeanDefinition parse(Element element, ParserContext parserContext) {
+  	// org.springframework.context.config.internalBeanConfigurerAspect
+	if (!parserContext.getRegistry().containsBeanDefinition(BEAN_CONFIGURER_ASPECT_BEAN_NAME)) {
+		RootBeanDefinition def = new RootBeanDefinition();
+      	 // org.springframework.beans.factory.aspectj.AnnotationBeanConfigurerAspect
+		def.setBeanClassName(BEAN_CONFIGURER_ASPECT_CLASS_NAME);
+		def.setFactoryMethodName("aspectOf");
+		def.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
+		def.setSource(parserContext.extractSource(element));
+		parserContext.registerBeanComponent(new BeanComponentDefinition
+			(def, BEAN_CONFIGURER_ASPECT_BEAN_NAME));
+	}
+	return null;
+}
+```
+
+很明显，把org.springframework.beans.factory.aspectj.AnnotationBeanConfigurerAspect添加到容器里了，这其实是一个切面，其类图:
+
+![AnnotationBeanConfigurerAspect类图](images/AnnotationBeanConfigurerAspect.jpg)
+
+AnnotationBeanConfigurerAspect及其父类其实是由aspectj源文件(.aj)编译而来，所以在spring-aspectj的源码包中看到的是.aj文件而不是.java。
+
+下面就去aj文件中看看到底定义了哪些pointcut以及advise。
+
+语法可以参考:
+
+[Spring 之AOP AspectJ切入点详解](http://jinnianshilongnian.iteye.com/blog/1415606)
+
+#### 切点(pointcut)
+
+##### inConfigurableBean
+
+在AnnotationBeanConfigurerAspect中定义，源码:
+
+```java
+public pointcut inConfigurableBean() : @this(Configurable);
+```
+
+@this没找到相关说明，结合@以及this的语义，猜测是匹配**带有@Configurable注解(以及作为元注解)的类**。
+
+##### beanConstruction
+
+源码:
+
+```java
+public pointcut beanConstruction(Object bean) :
+			initialization(ConfigurableObject+.new(..)) && this(bean);
+```
+
+initialization表示匹配构造器的调用，ConfigurableObject+表示ConfigurableObject及其子类，这就说明可以用实现ConfigurableObject接口的方式代替@Configurable注解。this(bean)表示this必须满足this instanceof bean，也就是说被代理的对象必须是bean的子类。
+
+##### preConstructionCondition
+
+```java
+private pointcut preConstructionCondition() :
+			leastSpecificSuperTypeConstruction() && preConstructionConfiguration();
+```
+
+由两个pointcut与运算而来。
+
+##### leastSpecificSuperTypeConstruction
+
+```java
+public pointcut leastSpecificSuperTypeConstruction() : initialization(ConfigurableObject.new(..));
+```
+
+##### 
+

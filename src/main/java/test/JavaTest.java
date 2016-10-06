@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 
 /**
@@ -52,6 +53,16 @@ public class JavaTest {
             System.out.println(pd.getReadMethod());
             System.out.println(pd.getWriteMethod());
         }
+    }
+
+    @Test
+    public void split() {
+        String str = "1\t2\taug\tfri\t14.7\t66\t2.7\t0\t0";
+        String[] arr = str.split("\t");
+        System.out.println(Arrays.toString(arr));
+        System.out.println(arr);
+        System.out.println("月份: " + arr[2]);
+        System.out.println("天气: " + arr[4]);
     }
 
 }

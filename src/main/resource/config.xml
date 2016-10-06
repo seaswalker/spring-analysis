@@ -14,18 +14,24 @@
         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
         http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd">
 
-    <context:component-scan base-package="base" />
+    <context:spring-configured />
+    <context:load-time-weaver aspectj-weaving="autodetect" />
 
-    <context:property-placeholder location="property.properties" trim-values="false" />
+    <bean class="base.SimpleBean" scope="prototype">
+        <property name="student" ref="student" />
+    </bean>
+
 
     <bean id="org.springframework.context.annotation.internalCommonAnnotationProcessor" class="org.springframework.context.annotation.CommonAnnotationBeanPostProcessor">
         <property name="initAnnotationType" value="annotation.Init" />
     </bean>
 
     <bean id="student" class="base.Student">
-        <property name="name" value="${student.name:王八}" />
-        <property name="age" value="${student.age}" />
-        <property name="id" value="${student.id}" />
+        <property name="name" value="skywalker" />
+        <property name="age" value="20" />
+        <property name="id" value="id" />
     </bean>
+
+
 
 </beans>

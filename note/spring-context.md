@@ -1805,6 +1805,42 @@ public class InstrumentationSavingAgent {
 
 解析的实现类是LoadTimeWeaverBeanDefinitionParser，其继承体系和property-override的PropertyOverrideBeanDefinitionParser类似。
 
+### LoadTimeWeaver
+
+此接口用于向ClassLoader添加ClassFileTransformer对象，其继承体系:
+
+![LoadTimeWeaver继承体系](images/LoadTimeWeaver.jpg)
+
+LoadTimeWeaverBeanDefinitionParser的父类初始化了一个DefaultContextLoadTimeWeaver类型的BeanDefinition放入容器，类型的决定位于LoadTimeWeaverBeanDefinitionParser.getBeanClassName:
+
+```java
+@Override
+protected String getBeanClassName(Element element) {
+  	// 如果配置了weaver-class属性，那么使用其值
+	if (element.hasAttribute(WEAVER_CLASS_ATTRIBUTE)) {
+		return element.getAttribute(WEAVER_CLASS_ATTRIBUTE);
+	}
+  	// org.springframework.context.weaving.DefaultContextLoadTimeWeaver
+	return DEFAULT_LOAD_TIME_WEAVER_CLASS_NAME;
+}
+```
+
+那么这个BeanDefinition的id/name又是什么呢?
+
+LoadTimeWeaverBeanDefinitionParser.resolveId:
+
+```java
+@Override
+protected String resolveId(Element element, AbstractBeanDefinition definition, ParserContext 	parserContext) {
+  	// loadTimeWeaver
+	return ConfigurableApplicationContext.LOAD_TIME_WEAVER_BEAN_NAME;
+}
+```
+
+DefaultContextLoadTimeWeaver其实是个包装类，包装了真正的LoadTimeWeaver，使用这层包装的目的就是可以根据外部环境(服务器代理或是Spring自己的代理)确定内部LoadTimeWeaver的实现，具体参见后面运行-BeanClassLoaderAware-setBeanClassLoadery一节。
+
+### LoadTimeWeaverBeanDefinitionParser
+
 LoadTimeWeaverBeanDefinitionParser.doParse:
 
 ```java
@@ -1932,5 +1968,379 @@ private pointcut preConstructionCondition() :
 public pointcut leastSpecificSuperTypeConstruction() : initialization(ConfigurableObject.new(..));
 ```
 
-##### 
+##### preConstructionConfiguration
+
+```java
+public pointcut preConstructionConfiguration() : preConstructionConfigurationSupport(*);
+private pointcut preConstructionConfigurationSupport(Configurable c) : @this(c) && if (c.preConstruction());
+```
+
+preConstruction表示@Configurable注解的preConstruction属性，此属性表示是否注入操作可以发生在构造之前，默认false。
+
+##### postConstructionCondition
+
+```java
+private pointcut postConstructionCondition() :
+			mostSpecificSubTypeConstruction() && !preConstructionConfiguration();
+```
+
+mostSpecificSubTypeConstruction:
+
+```java
+public pointcut mostSpecificSubTypeConstruction() :
+			if (thisJoinPoint.getSignature().getDeclaringType() == thisJoinPoint.getThis().getClass());
+```
+
+advise可以声明JoinPoint类型的方法参数，thisJoinpoint指的就是这个。此pointcut的目的是匹配接口/抽象类的最具体的实现。
+
+#### advise
+
+##### 前置
+
+```java
+before(Object bean) :
+	beanConstruction(bean) && preConstructionCondition() && inConfigurableBean()  {
+	configureBean(bean);
+}
+```
+
+## 运行
+
+AspectJWeavingEnabler.postProcessBeanFactory:
+
+```java
+@Override
+public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
+	enableAspectJWeaving(this.loadTimeWeaver, this.beanClassLoader);
+}
+```
+
+enableAspectJWeaving:
+
+```java
+public static void enableAspectJWeaving(LoadTimeWeaver weaverToUse, ClassLoader beanClassLoader) {
+  	// 不为空
+	if (weaverToUse == null) {
+		if (InstrumentationLoadTimeWeaver.isInstrumentationAvailable()) {
+			weaverToUse = new InstrumentationLoadTimeWeaver(beanClassLoader);
+		}
+		else {
+			throw new IllegalStateException("No LoadTimeWeaver available");
+		}
+	}
+	weaverToUse.addTransformer(
+			new AspectJClassBypassingClassFileTransformer(new ClassPreProcessorAgentAdapter()));
+}
+```
+
+### LoadTimeWeaverAware
+
+AspectJWeavingEnabler实现了LoadTimeWeaverAware接口，那么何时由谁进行注入的呢?
+
+当Context初始化时，AbstractApplicationContext.prepareBeanFactory部分源码:
+
+```java
+// loadTimeWeaver
+if (beanFactory.containsBean(LOAD_TIME_WEAVER_BEAN_NAME)) {
+	beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor(beanFactory));
+	// Set a temporary ClassLoader for type matching.
+	beanFactory.setTempClassLoader(new ContextTypeMatchClassLoader(beanFactory.getBeanClassLoader()));
+}
+```
+
+很明显，关键在于LoadTimeWeaverAwareProcessor，类图:
+
+![LoadTimeWeaverAwareProcessor类图](images/LoadTimeWeaverAwareProcessor.jpg)
+
+postProcessBeforeInitialization方法:
+
+```java
+@Override
+public Object postProcessBeforeInitialization(Object bean, String beanName) {
+	if (bean instanceof LoadTimeWeaverAware) {
+		LoadTimeWeaver ltw = this.loadTimeWeaver;
+		if (ltw == null) {
+			Assert.state(this.beanFactory != null,
+				"BeanFactory required if no LoadTimeWeaver explicitly specified");
+          	 // 去容器找 
+			ltw = this.beanFactory.getBean(
+				ConfigurableApplicationContext.LOAD_TIME_WEAVER_BEAN_NAME, LoadTimeWeaver.class);
+		}
+		((LoadTimeWeaverAware) bean).setLoadTimeWeaver(ltw);
+	}
+	return bean;
+}
+```
+
+可以看出，如果本地的loadTimeWeaver为空，那么会去容器找，调用了getBean方法，也就是说DefaultContextLoadTimeWeaver就是在这里初始化的。
+
+BeanFactoryPostProcessor也是一个bean，所以它的初始化也会BeanPostProcessor的处理。不过注意一点:
+
+BeanPostProcessor的注册是在BeanFactoryPostProcessor的调用之后进行的:
+
+AbstractApplicationContext.refresh:
+
+```java
+// Invoke factory processors registered as beans in the context.
+invokeBeanFactoryPostProcessors(beanFactory);
+// Register bean processors that intercept bean creation.
+registerBeanPostProcessors(beanFactory);
+```
+
+那么BeanFactoryPostProcessor初始化的时候执行处理的BeanPostProcessor是哪里来的?
+
+AbstractAutowireCapableBeanFactory.applyBeanPostProcessorsBeforeInitialization源码:
+
+```java
+@Override
+public Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, String beanName) {
+	Object result = existingBean;
+	for (BeanPostProcessor beanProcessor : getBeanPostProcessors()) {
+		result = beanProcessor.postProcessBeforeInitialization(result, beanName);
+		if (result == null) {
+			return result;
+		}
+	}
+	return result;
+}
+```
+
+getBeanPostProcessors:
+
+```java
+public List<BeanPostProcessor> getBeanPostProcessors() {
+	return this.beanPostProcessors;
+}
+```
+
+可以看出，并没有查找容器的过程，所以此处并不会导致BeanPostProcessor的初始化。问题的关键就在于LoadTimeWeaverAwareProcessor的添加方式:
+
+```java
+beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor(beanFactory));
+```
+
+直接将实例添加到BeanFactory中，所以可以得出结论:
+
+**我们自定义的BeanPostProcessor不会对BeanFactoryPostProcessor的初始化造成影响，除非使用调用BeanFactory.addBeanPostProcessor的方式进行添加**。
+
+### BeanClassLoaderAware
+
+#### 入口
+
+DefaultContextLoadTimeWeaver同样实现了此接口，那么哪里调用的呢?
+
+AbstractAutowireCapableBeanFactory.initializeBean调用了invokeAwareMethods方法，源码:
+
+```java
+private void invokeAwareMethods(final String beanName, final Object bean) {
+	if (bean instanceof Aware) {
+		if (bean instanceof BeanNameAware) {
+			((BeanNameAware) bean).setBeanName(beanName);
+		}
+		if (bean instanceof BeanClassLoaderAware) {
+			((BeanClassLoaderAware) bean).setBeanClassLoader(getBeanClassLoader());
+		}
+		if (bean instanceof BeanFactoryAware) {
+			((BeanFactoryAware) bean).setBeanFactory(AbstractAutowireCapableBeanFactory.this);
+		}
+	}
+}
+```
+
+#### setBeanClassLoader
+
+这个方法很关键，对instrument的获取就是在这里。源码:
+
+```java
+@Override
+public void setBeanClassLoader(ClassLoader classLoader) {
+	LoadTimeWeaver serverSpecificLoadTimeWeaver = createServerSpecificLoadTimeWeaver(classLoader);
+	if (serverSpecificLoadTimeWeaver != null) {
+		this.loadTimeWeaver = serverSpecificLoadTimeWeaver;
+	} else if (InstrumentationLoadTimeWeaver.isInstrumentationAvailable()) {
+		this.loadTimeWeaver = new InstrumentationLoadTimeWeaver(classLoader);
+	} else {
+		this.loadTimeWeaver = new ReflectiveLoadTimeWeaver(classLoader);
+	}
+}
+```
+
+很明显分为三部分。
+
+##### 服务器agent
+
+Spring首先会去检测是否存在服务器的agent代理。按照Spring doc里说的，支持下列服务器:
+
+> ```
+> Oracle WebLogic 10,GlassFish 3, Tomcat 6, 7 and 8, JBoss AS 5, 6 and 7, IBM WebSphere 7 and 8.
+> ```
+
+createServerSpecificLoadTimeWeaver源码:
+
+```java
+protected LoadTimeWeaver createServerSpecificLoadTimeWeaver(ClassLoader classLoader) {
+	String name = classLoader.getClass().getName();
+	if (name.startsWith("weblogic")) {
+		return new WebLogicLoadTimeWeaver(classLoader);
+	} else if (name.startsWith("org.glassfish")) {
+		return new GlassFishLoadTimeWeaver(classLoader);
+	} else if (name.startsWith("org.apache.catalina")) {
+		return new TomcatLoadTimeWeaver(classLoader);
+    } else if (name.startsWith("org.jboss")) {
+		return new JBossLoadTimeWeaver(classLoader);
+	} else if (name.startsWith("com.ibm")) {
+		return new WebSphereLoadTimeWeaver(classLoader);
+	}
+	return null;
+}
+```
+
+可以看出，**对于服务器的判断是通过检测当前的类加载器来实现的，因为这些服务器都使用了自己的类加载器实现**。
+
+这也从侧面说明，如果当前处于以上服务器所在的web应用环境，不需要spring-agent.jar便可以实现LTW(载入期织入)。
+
+##### Spring agent
+
+这个也是测试时使用的。InstrumentationLoadTimeWeaver.isInstrumentationAvailable：
+
+```java
+public static boolean isInstrumentationAvailable() {
+	return (getInstrumentation() != null);
+}
+
+private static Instrumentation getInstrumentation() {
+	if (AGENT_CLASS_PRESENT) {
+		return InstrumentationAccessor.getInstrumentation();
+	} else {
+		return null;
+	}
+}
+```
+
+AGENT_CLASS_PRESENT是一个布尔变量，就是判断org.springframework.instrument.InstrumentationSavingAgent是否存在，这个便是spring-agent.jar中唯一的类。
+
+InstrumentationAccessor是InstrumentationLoadTimeWeaver的内部类:
+
+```java
+private static class InstrumentationAccessor {
+	public static Instrumentation getInstrumentation() {
+		return InstrumentationSavingAgent.getInstrumentation();
+	}
+}
+```
+
+这里便是获取spring-agent.jar暴露的Instrumentation对象的地方了。
+
+##### 反射
+
+在这种情况中，Spring寄托于当前的ClassLoader实现了LoadTimeWeaver的功能，也就是必须有addTransformer方法，如果有，Spring便会把LoadTimeWeaver的职责委托给ClassLoader，如果没有只能抛异常了(抱歉，我们没法支持LTW...)，检测的源码位于ReflectiveLoadTimeWeaver的构造器:
+
+```java
+public ReflectiveLoadTimeWeaver() {
+	this(ClassUtils.getDefaultClassLoader());
+}
+
+public ReflectiveLoadTimeWeaver(ClassLoader classLoader) {
+	Assert.notNull(classLoader, "ClassLoader must not be null");
+	this.classLoader = classLoader;
+	this.addTransformerMethod = ClassUtils.getMethodIfAvailable(
+			this.classLoader.getClass(), ADD_TRANSFORMER_METHOD_NAME, ClassFileTransformer.class);
+	if (this.addTransformerMethod == null) {
+		throw new IllegalStateException();
+	}
+}
+```
+
+##### 总结
+
+其实可以不用Spring，只使用aspectj自己便可以实现LTW，只需要把代理jar包设为aspect-weaver.jar，并自己编写aop.xml文件以及相应的aspect类即可。可以参考官方文档:
+
+[Chapter 5. Load-Time Weaving](http://www.eclipse.org/aspectj/doc/released/devguide/ltw-configuration.html#enabling-load-time-weaving)
+
+### ClassFileTransformer
+
+从enableAspectJWeaving方法的源码可以看出，实际上就是向DefaultContextLoadTimeWeaver添加了一个AspectJClassBypassingClassFileTransformer对象。根据java instrument API的定义，每当一个Class被加载的时候都会去调用挂在Instrumentation上的ClassFileTransformer的transform方法。所以LTW的核心便在这里了。
+
+AspectJClassBypassingClassFileTransformer.transform:
+
+```java
+@Override
+public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
+		ProtectionDomain protectionDomain, byte[] classfileBuffer) {
+	// aspectj自身的类无需检测(织入)，直接跳过
+	if (className.startsWith("org.aspectj") || className.startsWith("org/aspectj")) {
+		return classfileBuffer;
+	}
+	return this.delegate.transform(loader, className, classBeingRedefined, 
+		protectionDomain, classfileBuffer);
+}
+```
+
+delegate是一个org.aspectj.weaver.loadtime.ClassPreProcessorAgentAdapter对象。这是一个适配器模式，其类图:
+
+![ClassPreProcessorAgentAdapter类图](images/ClassPreProcessorAgentAdapter.jpg)
+
+根据Aspectj的doc，ClassPreProcessor用于将Aspectj 5对于jdk5依赖代码抽取出来以便可以支持jdk1.3/1.4.
+
+### Aj
+
+Aj的preProcess方法很长，其实只干了两件事，都是围绕着WeavingAdaptor进行的。对类的处理也转交给WeavingAdaptor的weaveClass方法。
+
+####  缓存
+
+Aj使用了WeavingAdaptor缓存机制，确保一个ClassLoader只有一个WeavingAdaptor对象，因为其初始化的成本很高，缓存利用一个key为AdaptorKey(包装了ClassLoader), value为WeavingAdaptor的HashMap来实现。
+
+#### WeavingAdaptor初始化
+
+初始化就是ClassLoaderWeavingAdaptor.initialize方法，初始化分部分来进行说明。Aspectj部分不再详细展开，只对关键的部分进行说明。
+
+##### aop.xml
+
+###### 解析
+
+aop.xml的解析便是在这里进行。解析的过程无非是xml的解析，下面是其结果如何存储的:
+
+以org.aspectj.weaver.loadtime.definition.Definition为载体，我们以spring-aspects.jar下的aop.xml为例:
+
+```xml
+<aspectj>
+	<aspects>
+		<aspect name="org.springframework.beans.factory.aspectj.AnnotationBeanConfigurerAspect"/>
+		<aspect name="org.springframework.scheduling.aspectj.AnnotationAsyncExecutionAspect"/>
+		<aspect name="org.springframework.transaction.aspectj.AnnotationTransactionAspect"/>
+		<aspect name="org.springframework.transaction.aspectj.JtaAnnotationTransactionAspect"/>
+		<aspect name="org.springframework.cache.aspectj.AnnotationCacheAspect"/>
+		<aspect name="org.springframework.cache.aspectj.JCacheCacheAspect"/>
+	</aspects>
+</aspectj>
+```
+
+那么解析后的结果:
+
+![aop.xml解析结果](images/aop_xml_parse.png)
+
+###### 注册
+
+入口方法在ClassLoaderWeavingAdaptor.registerDefinitions:
+
+```java
+private boolean registerDefinitions(final BcelWeaver weaver, final ClassLoader loader, List<Definition> definitions) {
+  	//对应<weaver options="-verbose">
+	registerOptions(weaver, loader, definitions);
+  	//对应<exclude>标签
+	registerAspectExclude(weaver, loader, definitions);
+  	//对应<include>标签
+	registerAspectInclude(weaver, loader, definitions);
+  	// <aspect>
+	success = registerAspects(weaver, loader, definitions);
+	registerIncludeExclude(weaver, loader, definitions);
+  	//对应<dump>标签
+	registerDump(weaver, loader, definitions);
+  	//忽略返回
+}
+```
+
+其它的暂且不管，只关注一下aspect的注册。
+
+
 

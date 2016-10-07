@@ -20,7 +20,7 @@ import javax.annotation.Resource;
  *
  */
 @Configurable(autowire = Autowire.BY_NAME)
-public class SimpleBean implements ConfigurableObject {
+public class SimpleBean {
 
     @Autowired
 	private Student student;

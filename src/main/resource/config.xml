@@ -17,11 +17,6 @@
     <context:spring-configured />
     <context:load-time-weaver aspectj-weaving="autodetect" />
 
-    <bean class="base.SimpleBean" scope="prototype">
-        <property name="student" ref="student" />
-    </bean>
-
-
     <bean id="org.springframework.context.annotation.internalCommonAnnotationProcessor" class="org.springframework.context.annotation.CommonAnnotationBeanPostProcessor">
         <property name="initAnnotationType" value="annotation.Init" />
     </bean>
@@ -32,6 +27,6 @@
         <property name="id" value="id" />
     </bean>
 
-
+    <bean class="base.SimpleBeanPostProcessor" />
 
 </beans>

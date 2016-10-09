@@ -2340,7 +2340,9 @@ private boolean registerDefinitions(final BcelWeaver weaver, final ClassLoader l
 }
 ```
 
-其它的暂且不管，只关注一下aspect的注册。
+#### 总结
+
+Spring将切面以编译过的Aspectj语言形式定义，不过也可以用原生java类。spring-aspectj包定义的是供各个模块进行LTW的切面。Aspectj部分不再继续向下深入探究。
 
 
 

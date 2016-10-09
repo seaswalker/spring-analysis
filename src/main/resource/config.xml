@@ -14,19 +14,12 @@
         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
         http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd">
 
-    <context:spring-configured />
-    <context:load-time-weaver aspectj-weaving="autodetect" />
+    <bean id="aopAdvice" class="base.aop.AopDemoAdvice" />
 
-    <bean id="org.springframework.context.annotation.internalCommonAnnotationProcessor" class="org.springframework.context.annotation.CommonAnnotationBeanPostProcessor">
-        <property name="initAnnotationType" value="annotation.Init" />
-    </bean>
+    <bean id="aopDemo" class="base.aop.AopDemo" />
 
-    <bean id="student" class="base.Student">
-        <property name="name" value="skywalker" />
-        <property name="age" value="20" />
-        <property name="id" value="id" />
-    </bean>
-
-    <bean class="base.SimpleBeanPostProcessor" />
+    <aop:config>
+        <aop:advisor id="" order="" advice-ref="aopAdvice" pointcut="" pointcut-ref="" />
+    </aop:config>
 
 </beans>

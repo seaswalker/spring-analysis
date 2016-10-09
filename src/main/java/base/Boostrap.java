@@ -1,5 +1,6 @@
 package base;
 
+import base.aop.AopDemo;
 import org.springframework.context.annotation.CommonAnnotationBeanPostProcessor;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 
@@ -9,9 +10,9 @@ public class Boostrap {
 
 	public static void main(String[] args) {
 		ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("config.xml");
-        SimpleBean simpleBean = new SimpleBean();
-        System.out.println(simpleBean.getStudent());
-        context.close();
+        AopDemo aop = AopDemo.class.cast(context.getBean("aopDemo"));
+        aop.send();
+        aop.receive();
 	}
 	
 }

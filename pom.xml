@@ -39,17 +39,17 @@
             <artifactId>servlet-api</artifactId>
             <version>2.5</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/org.springframework/spring-aspects -->
+        <!-- https://mvnrepository.com/artifact/org.springframework/spring-jdbc -->
         <dependency>
             <groupId>org.springframework</groupId>
-            <artifactId>spring-aspects</artifactId>
+            <artifactId>spring-jdbc</artifactId>
             <version>4.3.2.RELEASE</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/org.springframework/spring-agent -->
+        <!-- https://mvnrepository.com/artifact/org.aspectj/aspectjweaver -->
         <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-agent</artifactId>
-            <version>2.5.6.SEC03</version>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjweaver</artifactId>
+            <version>1.8.9</version>
         </dependency>
         <dependency>
 			<groupId>junit</groupId>

@@ -19,7 +19,11 @@
     <bean id="aopDemo" class="base.aop.AopDemo" />
 
     <aop:config>
-        <aop:advisor id="" order="" advice-ref="aopAdvice" pointcut="" pointcut-ref="" />
+        <aop:pointcut id="pointcut" expression="execution(* base.aop.AopDemo.send())" />
+        <aop:aspect ref="aopAdvice">
+            <aop:before method="beforeSend" pointcut-ref="pointcut" />
+            <aop:after method="afterSend" pointcut-ref="pointcut" />
+        </aop:aspect>
     </aop:config>
 
 </beans>

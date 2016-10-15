@@ -248,5 +248,286 @@ public Object getAspectInstance() {
 
 从整个aop:aspect标签最终被解析为一个AspectJPointcutAdvisor来看，Spring在实现上仍将其作为Advisor的概念。
 
+## 运行
 
+运行的关键在于AspectJAwareAdvisorAutoProxyCreator，此对象在ConfigBeanDefinitionParser的configureAutoProxyCreator方法中注册，其类图:
+
+![AspectJAwareAdvisorAutoProxyCreator类图](images/AspectJAwareAdvisorAutoProxyCreator.jpg)
+
+从类图可以看出，运行的过程主要分为以下两部分:
+
+### setBeanFactory
+
+AbstractAdvisorAutoProxyCreator.setBeanFactory:
+
+```java
+@Override
+public void setBeanFactory(BeanFactory beanFactory) {
+  	//保存
+	super.setBeanFactory(beanFactory);
+	if (!(beanFactory instanceof ConfigurableListableBeanFactory)) {
+		throw new IllegalStateException("");
+	}
+	initBeanFactory((ConfigurableListableBeanFactory) beanFactory);
+}
+```
+
+initBeanFactory：
+
+```java
+protected void initBeanFactory(ConfigurableListableBeanFactory beanFactory) {
+	this.advisorRetrievalHelper = new BeanFactoryAdvisorRetrievalHelperAdapter(beanFactory);
+}
+```
+
+BeanFactoryAdvisorRetrievalHelperAdapter是AbstractAdvisorAutoProxyCreator的私有内部类，其类图:
+
+![BeanFactoryAdvisorRetrievalHelperAdapter类图](images/BeanFactoryAdvisorRetrievalHelperAdapter.jpg)
+
+这个东西用来从Spring BeanFactory中获取Advisor bean。
+
+### SmartInstantiationAwareBeanPostProcessor
+
+有用的是以下两个方法。
+
+#### postProcessBeforeInstantiation
+
+AbstractAutoProxyCreator.postProcessBeforeInstantiation:
+
+```java
+@Override
+public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) {
+	Object cacheKey = getCacheKey(beanClass, beanName);
+	if (beanName == null || !this.targetSourcedBeans.contains(beanName)) {
+		if (this.advisedBeans.containsKey(cacheKey)) {
+			return null;
+		}
+		if (isInfrastructureClass(beanClass) || shouldSkip(beanClass, beanName)) {
+			this.advisedBeans.put(cacheKey, Boolean.FALSE);
+			return null;
+		}
+	}
+  	//处理自定义TargetSource
+	if (beanName != null) {
+		TargetSource targetSource = getCustomTargetSource(beanClass, beanName);
+		if (targetSource != null) {
+			this.targetSourcedBeans.add(beanName);
+			Object[] specificInterceptors = 
+				getAdvicesAndAdvisorsForBean(beanClass, beanName, targetSource);
+			Object proxy = createProxy(beanClass, beanName, specificInterceptors, targetSource);
+			this.proxyTypes.put(cacheKey, proxy.getClass());
+			return proxy;
+		}
+	}
+	return null;
+}
+```
+
+##### TargetSource
+
+Spring的AOP代理的其实不是bean(target)，而是TargetSource，其类图:
+
+![TargetSource类图](images/TargetSource.jpg)
+
+一般我们都是没有配置的，所以此接口暂且不详细展开。可以参考:
+
+[spring-aop组件详解——TargetSource目标源](https://my.oschina.net/lixin91/blog/688188)
+
+##### 禁止代理
+
+Spring内部与AOP相关的一些类是不允许被代理的，advisedBeans正是用以实现此目的，只要是在此Map中出现，不会被代理。
+
+isInfrastructureClass：
+
+```java
+protected boolean isInfrastructureClass(Class<?> beanClass) {
+	boolean retVal = Advice.class.isAssignableFrom(beanClass) ||
+			Pointcut.class.isAssignableFrom(beanClass) ||
+			Advisor.class.isAssignableFrom(beanClass) ||
+			AopInfrastructureBean.class.isAssignableFrom(beanClass);
+	return retVal;
+}
+```
+
+shouldSkip方法由子类AspectJAwareAdvisorAutoProxyCreator实现:
+
+```java
+@Override
+protected boolean shouldSkip(Class<?> beanClass, String beanName) {
+  	//在BeanFActory中寻找Advisor bean
+	List<Advisor> candidateAdvisors = findCandidateAdvisors();
+	for (Advisor advisor : candidateAdvisors) {
+		if (advisor instanceof AspectJPointcutAdvisor) {
+			if (((AbstractAspectJAdvice) advisor.getAdvice()).
+					getAspectName().equals(beanName)) {
+				return true;
+			}
+		}
+	}
+	return super.shouldSkip(beanClass, beanName);
+}
+```
+
+从这里可以看出，**我们的切面(aspect)类也是禁止代理的**。
+
+#### postProcessAfterInitialization
+
+调用了wrapIfNecessary方法，这里便是生成代理子类的地方:
+
+```java
+protected Object wrapIfNecessary(Object bean, String beanName, Object cacheKey) {
+  	//略过是否可以代理的检查
+	// Create proxy if we have advice.
+	Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(bean.getClass(), beanName, null);
+	if (specificInterceptors != DO_NOT_PROXY) {
+		this.advisedBeans.put(cacheKey, Boolean.TRUE);
+		Object proxy = createProxy(
+				bean.getClass(), beanName, specificInterceptors, new SingletonTargetSource(bean));
+		this.proxyTypes.put(cacheKey, proxy.getClass());
+		return proxy;
+	}
+	this.advisedBeans.put(cacheKey, Boolean.FALSE);
+	return bean;
+}
+```
+
+##### 切点检查
+
+指的便是getAdvicesAndAdvisorsForBean方法，此方法用于寻找适用于当前bean的advice或是advisor，也就是说是否有pointcut指定了此bean的切点。
+
+AbstractAdvisorAutoProxyCreator.getAdvicesAndAdvisorsForBean:
+
+```java
+@Override
+protected Object[] getAdvicesAndAdvisorsForBean(Class<?> beanClass, String beanName, TargetSource targetSource) {
+	List<Advisor> advisors = findEligibleAdvisors(beanClass, beanName);
+	if (advisors.isEmpty()) {
+		return DO_NOT_PROXY;
+	}
+	return advisors.toArray();
+}
+```
+
+findEligibleAdvisors:
+
+```java
+protected List<Advisor> findEligibleAdvisors(Class<?> beanClass, String beanName) {
+  	//查找容器
+	List<Advisor> candidateAdvisors = findCandidateAdvisors();
+	List<Advisor> eligibleAdvisors = findAdvisorsThatCanApply(candidateAdvisors, beanClass, beanName);
+	extendAdvisors(eligibleAdvisors);
+	if (!eligibleAdvisors.isEmpty()) {
+		eligibleAdvisors = sortAdvisors(eligibleAdvisors);
+	}
+	return eligibleAdvisors;
+}
+```
+
+关键在于findAdvisorsThatCanApply方法，最终调用的是AopUtils.canApply:
+
+```java
+public static boolean canApply(Advisor advisor, Class<?> targetClass, boolean hasIntroductions) {
+  	//不管这种情况
+	if (advisor instanceof IntroductionAdvisor) {
+		return ((IntroductionAdvisor) advisor).getClassFilter().matches(targetClass);
+     //都是走这里
+	} else if (advisor instanceof PointcutAdvisor) {
+		PointcutAdvisor pca = (PointcutAdvisor) advisor;
+		return canApply(pca.getPointcut(), targetClass, hasIntroductions);
+	} else {
+		// It doesn't have a pointcut so we assume it applies.
+		return true;
+	}
+}
+```
+
+###### PointCut初始化
+
+其初始化其实在AspectJPointcutAdvisor的构造器中完成的，暂且就在这里说了:
+
+```java
+public AspectJPointcutAdvisor(AbstractAspectJAdvice advice) {
+	this.advice = advice;
+	this.pointcut = advice.buildSafePointcut();
+}
+```
+
+buildSafePointcut:
+
+```java
+public final Pointcut buildSafePointcut() {
+	Pointcut pc = getPointcut();
+	MethodMatcher safeMethodMatcher = MethodMatchers.intersection(
+			new AdviceExcludingMethodMatcher(this.aspectJAdviceMethod), pc.getMethodMatcher());
+	return new ComposablePointcut(pc.getClassFilter(), safeMethodMatcher);
+}
+```
+
+分为两部分:
+
+- 参数绑定:
+
+  getPointcut会调用calculateArgumentBindings方法，从而触发对参数的绑定，这里的参数指的是:
+
+  ```java
+  public void beforeSend(ProceedingJoinPoint joinPoint) {
+  	System.out.println("before send");
+  }
+  ```
+
+  calculateArgumentBindings源码:
+
+  ```java
+  public synchronized final void calculateArgumentBindings() {
+  	// The simple case... nothing to bind.
+  	if (this.argumentsIntrospected || this.parameterTypes.length == 0) {
+  		return;
+  	}
+  	int numUnboundArgs = this.parameterTypes.length;
+  	Class<?>[] parameterTypes = this.aspectJAdviceMethod.getParameterTypes();
+  	if (maybeBindJoinPoint(parameterTypes[0]) || maybeBindProceedingJoinPoint(parameterTypes[0])) {
+  		numUnboundArgs--;
+  	}
+  	else if (maybeBindJoinPointStaticPart(parameterTypes[0])) {
+  		numUnboundArgs--;
+  	}
+  	if (numUnboundArgs > 0) {
+  		// need to bind arguments by name as returned from the pointcut match
+  		bindArgumentsByName(numUnboundArgs);
+  	}
+  	this.argumentsIntrospected = true;
+  }
+  ```
+
+  可以看出，这里的绑定的结果就是把argumentsIntrospected置为了true。aspectJAdviceMethod来自于MethodLocatingFactoryBean。
+
+- MethodMatcher
+
+  pc.getMethodMatcher返回的实际上就是AspectJExpressionPointcut，在aop:pointcut中有其类图。getMethodMatcher会导致对Pointcut表达式的解析，具体怎么解析的就不追究了。
+
+###### canApply
+
+简略版源码:
+
+```java
+public static boolean canApply(Pointcut pc, Class<?> targetClass, boolean hasIntroductions) {
+	MethodMatcher methodMatcher = pc.getMethodMatcher();
+	if (methodMatcher == MethodMatcher.TRUE) {
+		// No need to iterate the methods if we're matching any method anyway...
+		return true;
+	}
+	Set<Class<?>> classes = new LinkedHashSet<Class<?>>
+		(ClassUtils.getAllInterfacesForClassAsSet(targetClass));
+	classes.add(targetClass);
+	for (Class<?> clazz : classes) {
+		Method[] methods = ReflectionUtils.getAllDeclaredMethods(clazz);
+		for (Method method : methods) {
+			if (methodMatcher.matches(method, targetClass)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+```
 

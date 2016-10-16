@@ -26,4 +26,6 @@
         </aop:aspect>
     </aop:config>
 
+    <aop:scoped-proxy proxy-target-class="true"></aop:scoped-proxy>
+
 </beans>

@@ -762,5 +762,161 @@ createAopProxy创建的是一个AopProxy对象，其类图:
   }
   ```
 
-  ​
+  不再向下追究。
+
+- Cglib代理:
+
+  你懂滴。
+
+
+# aop:scoped-proxy
+
+此配置一般是这样使用:
+
+```xml
+<bean id="userPreferences" class="com.foo.UserPreferences" scope="session">
+    <aop:scoped-proxy/>
+</bean>
+<bean id="userManager" class="com.foo.UserManager">
+    <property name="userPreferences" ref="userPreferences"/>
+</bean>
+```
+
+对于ref属性，**只会在userManager初始化时注入一次**。这会造成什么问题呢?以session的Scope为例，因为只会注入一次，所以，**userManager引用的始终是同一个userPreferences对象，即使现在可能已经过时了**。此配置便可以使userManager引用的其实是一个对代理的引用，所以可以始终获取到最新的userPreferences。
+
+其作用和注解@ScopedProxy相同。
+
+其解析由ScopedProxyBeanDefinitionDecorator完成，类图:
+
+![ScopedProxyBeanDefinitionDecorator类图](images/ScopedProxyBeanDefinitionDecorator.jpg)
+
+## 解析
+
+### 入口
+
+从类图可以看出，ScopedProxyBeanDefinitionDecorator和之前的解析器都不同，它的调用入口不同以往:
+
+DefaultBeanDefinitionDocumentReader.processBeanDefinition:
+
+```java
+protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {
+	BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
+	if (bdHolder != null) {
+      	 // 装饰
+		bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
+	}
+}
+```
+
+BeanDefinitionParserDelegate.decorateIfRequired:
+
+```java
+public BeanDefinitionHolder decorateIfRequired(
+		Node node, BeanDefinitionHolder originalDef, BeanDefinition containingBd) {
+	String namespaceUri = getNamespaceURI(node);
+	if (!isDefaultNamespace(namespaceUri)) {
+		NamespaceHandler handler = this.readerContext.getNamespaceHandlerResolver()
+			.resolve(namespaceUri);
+		if (handler != null) {
+			return handler.
+				decorate(node, originalDef, new ParserContext(this.readerContext, this, containingBd));
+		}
+	}
+	return originalDef;
+}
+```
+
+一目了然。
+
+这么做(装饰)的原因就是此标签是用在bean内部的，从decorate的方法签名可以看出，第二个便是父(bean)BeanDefinition，所以叫做装饰。
+
+### 装饰
+
+```java
+@Override
+public BeanDefinitionHolder decorate(Node node, BeanDefinitionHolder definition, ParserContext parserContext) {
+	boolean proxyTargetClass = true;
+	if (node instanceof Element) {
+		Element ele = (Element) node;
+		if (ele.hasAttribute(PROXY_TARGET_CLASS)) {
+			proxyTargetClass = Boolean.valueOf(ele.getAttribute(PROXY_TARGET_CLASS));
+		}
+	}
+	BeanDefinitionHolder holder =
+			ScopedProxyUtils.
+			createScopedProxy(definition, parserContext.getRegistry(), proxyTargetClass);
+	String targetBeanName = ScopedProxyUtils.getTargetBeanName(definition.getBeanName());
+  	// 空实现
+	parserContext.getReaderContext().fireComponentRegistered(
+			new BeanComponentDefinition(definition.getBeanDefinition(), targetBeanName));
+	return holder;
+}
+```
+
+核心便是createScopedProxy方法，其源码较长，但是这个套路之前见识过了，就是一个偷天换日: 创建一个新的BeanDefinition对象，beanName为被代理的bean的名字，被代理的bean名字为scopedTarget.原名字。被代理的bean扔将被注册到容器中。
+
+新的BeanDefintion的beanClass为ScopedProxyFactoryBean，其类图:
+
+![ScopedProxyFactoryBean类图](images/ScopedProxyFactoryBean.jpg)
+
+## 代理生成
+
+入口便是setBeanFactory方法:
+
+```java
+@Override
+public void setBeanFactory(BeanFactory beanFactory) {
+	ConfigurableBeanFactory cbf = (ConfigurableBeanFactory) beanFactory;
+	this.scopedTargetSource.setBeanFactory(beanFactory);
+	ProxyFactory pf = new ProxyFactory();
+	pf.copyFrom(this);
+	pf.setTargetSource(this.scopedTargetSource);
+
+	Class<?> beanType = beanFactory.getType(this.targetBeanName);
+	if (!isProxyTargetClass() || beanType.isInterface() || 
+		Modifier.isPrivate(beanType.getModifiers())) {
+      	 // JDK动态代理可用的接口
+		pf.setInterfaces(ClassUtils.getAllInterfacesForClass(beanType, cbf.getBeanClassLoader()));
+	}
+	// Add an introduction that implements only the methods on ScopedObject.
+	ScopedObject scopedObject = new DefaultScopedObject
+		(cbf, this.scopedTargetSource.getTargetBeanName());
+	pf.addAdvice(new DelegatingIntroductionInterceptor(scopedObject));
+	// Add the AopInfrastructureBean marker to indicate that the scoped proxy
+	// itself is not subject to auto-proxying! Only its target bean is.
+	pf.addInterface(AopInfrastructureBean.class);
+	this.proxy = pf.getProxy(cbf.getBeanClassLoader());
+}
+```
+
+这个套路上面也见过了。
+
+### Advisor
+
+核心的拦截逻辑是通过DelegatingIntroductionInterceptor来完成的，其类图:
+
+![DelegatingIntroductionInterceptor类图](images/DelegatingIntroductionInterceptor.jpg)
+
+AdvisedSupport.addAdvice方法将其转化为Advisor:
+
+```java
+@Override
+public void addAdvice(int pos, Advice advice) throws AopConfigException {
+	if (advice instanceof IntroductionInfo) {
+		// We don't need an IntroductionAdvisor for this kind of introduction:
+		// It's fully self-describing.
+		addAdvisor(pos, new DefaultIntroductionAdvisor(advice, (IntroductionInfo) advice));
+	} else if (advice instanceof DynamicIntroductionAdvice) {
+		// We need an IntroductionAdvisor for this kind of introduction.
+    } else {
+		addAdvisor(pos, new DefaultPointcutAdvisor(advice));
+	}
+}
+```
+
+显然，DelegatingIntroductionInterceptor被包装为DefaultIntroductionAdvisor对象。
+
+DelegatingIntroductionInterceptor到底是个什么东西呢?这其实就引出了Spring的Introduction(引入)概念。
+
+#### 引入
 

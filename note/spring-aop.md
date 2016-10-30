@@ -918,5 +918,252 @@ public void addAdvice(int pos, Advice advice) throws AopConfigException {
 
 DelegatingIntroductionInterceptor到底是个什么东西呢?这其实就引出了Spring的Introduction(引入)概念。
 
-#### 引入
+### 引入
+
+通常意义上的Spring AOP一般是在方法层面上进行逻辑的改变，而引入指的是在不修改类源码的情况下，**直接为一个类添加新的功能**。下面是一个引入使用的例子:
+
+[SpringAOP中的IntroductionInterceptor](http://blog.csdn.net/lzghxjt/article/details/51974336)
+
+## 例子
+
+### 自定义Scope
+
+为了便于测试，我们定义一个生存周期仅仅在于一次调用的Scope，源码:
+
+```java
+public class OneScope implements Scope {
+
+    private int index = 0;
+
+    @Override
+    public Object get(String name, ObjectFactory<?> objectFactory) {
+        System.out.println("get被调用");
+        return new Student("skywalker-" + (index++), index);
+    }
+	//忽略其它方法
+}
+```
+
+将其注册到容器中，有两种方法:
+
+- 在代码中: 
+
+  ```java
+  context.getBeanFactory().registerScope("one", new OneScope());
+  ```
+
+- 配置文件:
+
+  ```xml
+  <bean class="org.springframework.beans.factory.config.CustomScopeConfigurer">
+  	<property name="scopes">
+  		<map>
+  			<entry key="one">
+  				<bean class="base.scope.OneScope" />
+  			</entry>
+  		</map>
+  	</property>
+  </bean>
+  ```
+
+### 配置
+
+此时就可以使用我们自己的Scope了:
+
+```xml
+<bean class="base.SimpleBean" id="simpleBean">
+	<property name="student" ref="student" />
+</bean>
+
+<bean id="student" class="base.Student" scope="one">
+	<aop:scoped-proxy />
+</bean>
+```
+
+### 测试
+
+执行以下代码:
+
+```java
+SimpleBean simpleBean = context.getBean(SimpleBean.class);
+System.out.println(simpleBean.getStudent().getName());
+System.out.println(simpleBean.getStudent().getName());
+```
+
+可以看到以下输出:
+
+```html
+get被调用
+skywalker-0
+get被调用
+skywalker-1
+```
+
+可以得出结论: **当调用被代理的bean的方法时才会触发Scoped的语义，只是获得其对象(getStudent)没有效果**。
+
+## 原理
+
+### doGetBean
+
+从根本上来说在于AbstractBeanFactory.doGetBean，部分源码:
+
+```java
+//scope非prototype和Singleton
+else {
+	String scopeName = mbd.getScope();
+	final Scope scope = this.scopes.get(scopeName);
+	Object scopedInstance = scope.get(beanName, new ObjectFactory<Object>() {
+		@Override
+		public Object getObject() throws BeansException {
+			beforePrototypeCreation(beanName);
+			try {
+				return createBean(beanName, mbd, args);
+			}
+			finally {
+				afterPrototypeCreation(beanName);
+			}
+		}
+	});
+	bean = getObjectForBeanInstance(scopedInstance, name, beanName, mbd);
+}
+```
+
+scopes是BeanFactory内部的一个 LinkedHashMap<String, Scope>类型的对象。scope.get实际上调用的就是我们的OneSocpe的get方法，没有用到ObjectFactory。
+
+所以，**每调用一次getBean，就会导致一个新的Sudent被创建并返回**。
+
+### 代理子类
+
+还有一个关键的问题，从上面可以知道SimpleBean内部的student引用其实是一个CGLIB代理子类的对象，那么当调用这个代理对象的相应方法(比如getName)时，是怎样导致Student重新创建(或是getBean被调用)的?
+
+### CallbackFilter & Callback
+
+必须首先理解下CGLIB的这两个概念。
+
+#### Callback
+
+**Callback是Cglib所有自定义逻辑(增强)的共同接口**。
+
+其简略类图:
+
+![Callback类图](images/Callback.jpg)
+
+#### CallbackFilter
+
+**在CGLib回调时可以设置对不同方法执行不同的回调逻辑，或者根本不执行回调。**
+
+jdk并不支持这么搞，只支持设置一个InvocationHandler处理(拦截)所有的方法。其类图:
+
+![CallbackFilter类图](images/CallbackFilter.jpg)
+
+Cglib的Enhancer可以指定一个Callback数组，而accept方法的返回值是一个int值，其实就是Callback数组的下标，这样便达到了指定回调逻辑的目的。
+
+参考:
+
+[CGLIB介绍与原理](http://blog.csdn.net/zghwaicsdn/article/details/50957474)
+
+### 回调
+
+一般的方法使用的是DynamicAdvisedInterceptor作为回调逻辑，其intercept关键源码:
+
+```java
+@Override
+public Object intercept(Object proxy, Method method, Object[] args, MethodProxy methodProxy) {
+	Object target = getTarget();
+}
+```
+
+target就是被代理对象。
+
+getTarget:
+
+```java
+protected Object getTarget() throws Exception {
+	return this.advised.getTargetSource().getTarget();
+}
+```
+
+TargetSource前面说过了，默认是SimpleBeanTargetSource:
+
+```java
+@Override
+public Object getTarget() throws Exception {
+	return getBeanFactory().getBean(getTargetBeanName());
+}
+```
+
+至此，真相大白。
+
+# aop:aspectj-autoproxy
+
+此标签用以开启对于@AspectJ注解风格AOP的支持。
+
+## 属性
+
+### proxy-target-class
+
+你懂的。
+
+### expose-proxy
+
+是否应该把代理对象暴露给AopContext，默认false。
+
+## 栗子
+
+### 切面
+
+```java
+@Aspect
+public class AspectDemo {
+    @Pointcut("execution(void base.aop.AopDemo.send(..))")
+    public void beforeSend() {}
+    @Before("beforeSend()")
+    public void before() {
+        System.out.println("send之前");
+    }
+}
+```
+
+### 被代理类
+
+```java
+public class AopDemo implements AopDemoInter {
+    public void send() {
+        System.out.println("send from aopdemo");
+    }
+    public void receive() {
+        System.out.println("receive from aopdemo");
+    }
+    @Override
+    public void inter() {
+        System.out.println("inter");
+    }
+}
+```
+
+### 配置
+
+```xml
+<aop:aspectj-autoproxy proxy-target-class="true" />
+<bean class="base.aop.AopDemo" />
+<bean class="base.aop.annotation.AspectDemo" />
+```
+
+因为AopDemo实现了AopDemoInter接口，但做实验的send方法又不在此接口里定义，所以只能用cglib的方式代理。
+
+可以看出，**即使标注了@Aspect注解，仍然需要将切面自己配置到Spring容器中。**
+
+## 解析
+
+AspectJAutoProxyBeanDefinitionParser.parse:
+
+```java
+@Override
+public BeanDefinition parse(Element element, ParserContext parserContext) {
+	AopNamespaceUtils.
+		registerAspectJAnnotationAutoProxyCreatorIfNecessary(parserContext, element);
+	extendBeanDefinition(element, parserContext);
+	return null;
+}
+```
 

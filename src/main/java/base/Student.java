@@ -1,7 +1,5 @@
 package base;
 
-import org.springframework.stereotype.Component;
-
 public class Student extends BaseStudent {
 
 	private String name;
@@ -19,8 +17,16 @@ public class Student extends BaseStudent {
 	public void setAge(int age) {
 		this.age = age;
 	}
-	
-	@Override
+
+    public Student(String name, int age) {
+        this.age = age;
+        this.name = name;
+    }
+
+    public Student() {
+    }
+
+    @Override
 	public String toString() {
 		return "Student [name=" + name + ", age=" + age + "]";
 	}

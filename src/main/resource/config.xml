@@ -14,18 +14,9 @@
         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
         http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd">
 
-    <bean id="aopAdvice" class="base.aop.AopDemoAdvice" />
+    <aop:aspectj-autoproxy proxy-target-class="true" />
 
     <bean id="aopDemo" class="base.aop.AopDemo" />
-
-    <aop:config>
-        <aop:pointcut id="pointcut" expression="execution(* base.aop.AopDemo.send())" />
-        <aop:aspect ref="aopAdvice">
-            <aop:before method="beforeSend" pointcut-ref="pointcut" />
-            <aop:after method="afterSend" pointcut-ref="pointcut" />
-        </aop:aspect>
-    </aop:config>
-
-    <aop:scoped-proxy proxy-target-class="true"></aop:scoped-proxy>
+    <bean class="base.aop.annotation.AspectDemo" />
 
 </beans>

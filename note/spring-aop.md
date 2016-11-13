@@ -681,7 +681,36 @@ public Object getProxy(ClassLoader classLoader) {
 
 ###### equals & hashCode
 
+如果被代理类实现了equals或者是hashCode方法，那么生成的代理子类的equals、hashCode方法实际上执行的是JdkDynamicAopProxy相应方法的逻辑。
 
+invoke方法部分源码:
+
+```java
+if (!this.equalsDefined && AopUtils.isEqualsMethod(method)) {
+	// The target does not implement the equals(Object) method itself.
+	return equals(args[0]);
+}
+```
+
+###### 链式调用
+
+对于切点方法，比如前面aop:aspect示例配置中的beforeSend
+
+```xml
+<aop:before method="beforeSend" pointcut-ref="pointcut" />
+```
+
+Spring会创建一个MethodInvocation对象对所有相关的Advisor进行链式调用。invoke相关源码:
+
+```java
+List<Object> chain = this.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
+invocation = new ReflectiveMethodInvocation(proxy, target, method, args, targetClass, chain);
+Object retVal = invocation.proceed();
+```
+
+##### Cglib
+
+同样是对于Advisor的链式调用，不再详细展开。
 
 # aop:scoped-proxy
 
@@ -1081,7 +1110,35 @@ public BeanDefinition parse(Element element, ParserContext parserContext) {
 }
 ```
 
-### 注册代理类创建器
+注册最终在AopConfigUtils.registerOrEscalateApcAsRequired方法中完成，创建器实际上是一个AnnotationAwareAspectJAutoProxyCreator类的对象，此类是前面AspectJAwareAdvisorAutoProxyCreator的子类。
 
-注册最终在AopConfigUtils.registerOrEscalateApcAsRequired方法中完成，创建器实际上是一个AnnotationAwareAspectJAutoProxyCreator类的示例，其类图:
+## 原理
 
+既然是AspectJAwareAdvisorAutoProxyCreator的子类，那么其代理子类的创建等核心逻辑自然是一样的。这里所需要关注的地方自然是所不一样的地方: 即是如何体现其注解的特性的。
+
+前面说过，AspectJAwareAdvisorAutoProxyCreator通过findCandidateAdvisors方法来找到适用于bean的Advisor，所以注解的特性也是通过重写此方法来体现。
+
+AnnotationAwareAspectJAutoProxyCreator.findCandidateAdvisors:
+
+```java
+@Override
+protected List<Advisor> findCandidateAdvisors() {
+	List<Advisor> advisors = super.findCandidateAdvisors();
+  	//这里
+	advisors.addAll(this.aspectJAdvisorsBuilder.buildAspectJAdvisors());
+	return advisors;
+}
+```
+
+buildAspectJAdvisors方法所做的便是**从容器中得到所有的bean，逐一判断是不是一个Aspect**。那么判断Aspect的依据是什么?
+
+AbstractAspectJAdvisorFactory.isAspect:
+
+```java
+@Override
+public boolean isAspect(Class<?> clazz) {
+	return (hasAspectAnnotation(clazz) && !compiledByAjc(clazz));
+}
+```
+
+至于其它的实现细节不再探究。

@@ -1142,3 +1142,7 @@ public boolean isAspect(Class<?> clazz) {
 ```
 
 至于其它的实现细节不再探究。
+
+## 总结
+
+Spring对于AspectJ风格AOP的支持停留在外表(注解)上面，内部的实现仍然是自己的东西。

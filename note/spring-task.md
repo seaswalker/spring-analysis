@@ -299,3 +299,29 @@ public ScheduledTask scheduleFixedDelayTask(IntervalTask task) {
 
 从上面的说明可以看出，Spring其实将核心逻辑委托给了JDK的Executors.newSingleThreadScheduledExecutor()来实现，那么JDK是如何用一个线程来定时执行多个任务的呢?
 
+# 异步执行
+
+## 配置
+
+必须以注解的方式进行配置，xml:
+
+```xml
+<task:executor id="executor" pool-size="3"/>
+<task:annotation-driven executor="executor"/>
+```
+
+这样在类或方法上加上注解即可:
+
+```java
+@Async("executor")
+public void print() {
+	System.out.println("print执行");
+}
+```
+
+## 原理
+
+猜测:
+
+Spring会为带有@Async的组件生成代理子类实现对原生组件的替换，代理子类将异步执行的方法包装为Task(Runnable)提交到jdk的线程池即可。
+

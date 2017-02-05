@@ -1,5 +1,7 @@
 package task;
 
+import org.springframework.scheduling.annotation.Async;
+
 /**
  * 测试Spring Task.
  *
@@ -7,6 +9,7 @@ package task;
  */
 public class Task {
 
+    @Async("executor")
     public void print() {
         System.out.println("print执行");
     }

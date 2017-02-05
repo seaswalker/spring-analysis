@@ -14,15 +14,8 @@
         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
         http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd">
 
-    <task:scheduler id="scheduler" pool-size="3"/>
     <task:executor id="executor" pool-size="3"/>
 
-    <bean id="task" class="task.Task"/>
-
-    <task:scheduled-tasks scheduler="scheduler">
-        <task:scheduled  ref="task" method="print" cron="0/5 * * * * ?" fixed-delay="" fixed-rate="" trigger=""/>
-    </task:scheduled-tasks>
-
-    <task:annotation-driven
+    <task:annotation-driven executor="executor"/>
 
 </beans>

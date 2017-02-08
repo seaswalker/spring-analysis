@@ -186,33 +186,17 @@ Strength getKeyStrength() {
 
 recencyQueue等队列将在后面结合get方法进行说明。
 
-# get(key)
+# put
 
-即LocalLoadingCache.get:
+LocalCache.put:
 
 ```java
 @Override
-public V get(K key) throws ExecutionException {
-	return localCache.getOrLoad(key);
-}
-```
-
-LocalCache.getOrLoad:
-
-```java
-V getOrLoad(K key) throws ExecutionException {
-	return get(key, defaultLoader);
-}
-```
-
-defaultLoader便是在构造时指定的CacheLoader对象。
-
-LocalCache.get:
-
-```java
-V get(K key, CacheLoader<? super K, V> loader) throws ExecutionException {
-	int hash = hash(checkNotNull(key));
-    return segmentFor(hash).get(key, hash, loader);
+public V put(K key, V value) {
+	checkNotNull(key);
+    checkNotNull(value);
+    int hash = hash(key);
+    return segmentFor(hash).put(key, hash, value, false);
 }
 ```
 
@@ -342,6 +326,167 @@ segmentMask = segmentCount - 1;
 ```
 
 可以看出，寻找Segment的过程其实是对**hashCode先取高n位，再取余的过程**。
+
+## Segment.put
+
+源码很长，下面分部分说明。
+
+### 线程安全性
+
+部分源码:
+
+```java
+@Nullable
+V put(K key, int hash, V value, boolean onlyIfAbsent) {
+	lock();
+	try {
+		//...
+    } finally {
+		unlock();
+        postWriteCleanup();
+	}
+}
+```
+
+可见，核心逻辑都位于锁的保护之中。
+
+### 过期/垃圾缓存清理
+
+相关源码:
+
+```java
+long now = map.ticker.read();
+preWriteCleanup(now);
+```
+
+ticker.read方法返回的实际上就是System.nanoTime的值。preWriteCleanup最终调用runLockedCleanup方法:
+
+```java
+void runLockedCleanup(long now) {
+  	//必定通过
+	if (tryLock()) {
+    	try {
+			drainReferenceQueues();
+			expireEntries(now); // calls drainRecencyQueue
+          	readCount.set(0);
+        } finally {
+			unlock();
+        }
+	}
+}
+```
+
+#### 垃圾缓存
+
+当引用类型是弱引用或是虚引用，垃圾缓存才会存在，当JVM对这些缓存进行回收时，会将已经失效的**引用对象**放到特定的ReferenceQueue中，清理便是针对此队列进行，防止无用的引用对象浪费内存空间。
+
+drainReferenceQueues:
+
+```java
+@GuardedBy("this")
+void drainReferenceQueues() {
+	if (map.usesKeyReferences()) {
+    	drainKeyReferenceQueue();
+	}
+	if (map.usesValueReferences()) {
+    	drainValueReferenceQueue();
+	}
+}
+```
+
+以drainKeyReferenceQueue为例:
+
+```java
+@GuardedBy("this")
+void drainKeyReferenceQueue() {
+	Reference<? extends K> ref;
+	int i = 0;
+    while ((ref = keyReferenceQueue.poll()) != null) {
+    	@SuppressWarnings("unchecked")
+        ReferenceEntry<K, V> entry = (ReferenceEntry<K, V>) ref;
+        map.reclaimKey(entry);
+        if (++i == DRAIN_MAX) {
+        	break;
+        }
+	}
+}
+```
+
+DRAIN_MAX取值16，猜测这样做的目的在于降低开销，防止一次put操作耗费过多的时间。
+
+reclaimKey用于清理key对应的value，key已经被回收了，value也没必要保留了。
+
+```java
+boolean reclaimKey(ReferenceEntry<K, V> entry, int hash) {
+	lock();
+	try {
+        int newCount = count - 1;
+        AtomicReferenceArray<ReferenceEntry<K, V>> table = this.table;
+        int index = hash & (table.length() - 1);
+        ReferenceEntry<K, V> first = table.get(index);
+
+        for (ReferenceEntry<K, V> e = first; e != null; e = e.getNext()) {
+			if (e == entry) {
+            	++modCount;
+            	ReferenceEntry<K, V> newFirst =
+                	removeValueFromChain(
+                    	first,
+                    	e,
+                    	e.getKey(),
+                    	hash,
+                    	e.getValueReference().get(),
+                    	e.getValueReference(),
+                    	RemovalCause.COLLECTED);
+            	newCount = this.count - 1;
+            	table.set(index, newFirst);
+            	this.count = newCount; // write-volatile
+            	return true;
+			}
+		}
+		return false;
+	} finally {
+        unlock();
+        postWriteCleanup();
+	}
+}
+```
+
+注意两点:
+
+- 可以看出，guava cache也是**采用链表的形式解决hash冲突的**。源码中for循环便是遍历链表寻找指定的引用的过程。
+- removeValueFromChain方法真正的完成移除value的操作
+
+- [ ] Here!!!!!!!!!!!!!!!!!!!!!!!!
+
+# get(key)
+
+即LocalLoadingCache.get:
+
+```java
+@Override
+public V get(K key) throws ExecutionException {
+	return localCache.getOrLoad(key);
+}
+```
+
+LocalCache.getOrLoad:
+
+```java
+V getOrLoad(K key) throws ExecutionException {
+	return get(key, defaultLoader);
+}
+```
+
+defaultLoader便是在构造时指定的CacheLoader对象。
+
+LocalCache.get:
+
+```java
+V get(K key, CacheLoader<? super K, V> loader) throws ExecutionException {
+	int hash = hash(checkNotNull(key));
+    return segmentFor(hash).get(key, hash, loader);
+}
+```
 
 ## get(key,hash,loader)
 

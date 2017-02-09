@@ -414,7 +414,7 @@ void drainKeyReferenceQueue() {
 
 DRAIN_MAX取值16，猜测这样做的目的在于降低开销，防止一次put操作耗费过多的时间。
 
-reclaimKey用于清理key对应的value，key已经被回收了，value也没必要保留了。
+reclaimKey用于清理ReferenceEntry对象，因为**keyReference和valueReference是保存在此类中的**。
 
 ```java
 boolean reclaimKey(ReferenceEntry<K, V> entry, int hash) {
@@ -453,10 +453,111 @@ boolean reclaimKey(ReferenceEntry<K, V> entry, int hash) {
 
 注意两点:
 
-- 可以看出，guava cache也是**采用链表的形式解决hash冲突的**。源码中for循环便是遍历链表寻找指定的引用的过程。
-- removeValueFromChain方法真正的完成移除value的操作
+- guava cache也是**采用链表的形式解决hash冲突的**。源码中for循环便是遍历链表寻找指定的引用的过程。
+- removeValueFromChain方法真正的完成移除value的操作。
 
-- [ ] Here!!!!!!!!!!!!!!!!!!!!!!!!
+removeValueFromChain:
+
+```java
+ReferenceEntry<K, V> removeValueFromChain(
+	ReferenceEntry<K, V> first,
+	ReferenceEntry<K, V> entry,
+	@Nullable K key,
+	int hash, V value, ValueReference<K, V> valueReference, RemovalCause cause) {
+		enqueueNotification(key, hash, value, valueReference.getWeight(), cause);
+      	writeQueue.remove(entry);
+      	accessQueue.remove(entry);
+      	if (valueReference.isLoading()) {
+       		valueReference.notifyNewValue(null);
+        	return first;
+      	} else {
+        	return removeEntryFromChain(first, entry);
+      	}
+}
+```
+
+##### 善后
+
+enqueueNotification用于进行一些移除之后的善后工作(然而却是在 移除之前执行的):
+
+```java
+@GuardedBy("this")
+void enqueueNotification(@Nullable K key, int hash, @Nullable V value, int weight, RemovalCause cause) {
+  	//减少权重
+	totalWeight -= weight;
+  	//分析统计
+	if (cause.wasEvicted()) {
+		statsCounter.recordEviction();
+	}
+	if (map.removalNotificationQueue != DISCARDING_QUEUE) {
+		RemovalNotification<K, V> notification = RemovalNotification.create(key, value, cause);
+        map.removalNotificationQueue.offer(notification);
+	}
+}
+```
+
+加入removalNotificationQueue的目的在于通知我们自定义的**移除监听器**，LocalCache构造器相关源码回顾:
+
+```java
+//...
+removalListener = builder.getRemovalListener();
+    removalNotificationQueue =
+        (removalListener == NullListener.INSTANCE)
+            ? LocalCache.<RemovalNotification<K, V>>discardingQueue()
+            : new ConcurrentLinkedQueue<RemovalNotification<K, V>>();
+//...
+```
+
+可以通过CacheBuilder的removalListener方法指定监听器。
+
+##### writeQueue移除
+
+初始化在Segment构造器，相关源码:
+
+```java
+ writeQueue =
+          map.usesWriteQueue()
+              ? new WriteQueue<K, V>()
+              : LocalCache.<ReferenceEntry<K, V>>discardingQueue();
+```
+
+usesWriteQueue最终的逻辑在expiresAfterWrite:
+
+```java
+boolean expiresAfterWrite() {
+	return expireAfterWriteNanos > 0;
+}
+```
+
+这其实是guava cache提供的一种缓存淘汰策略，即**记录最后一次执行写入的时间，按照此时间间隔进行淘汰**，WriteQueue用于按照写入的顺序进行排序，直接继承自JDK的AbstractQueue。
+
+此策略可以通过CacheBuilder的expireAfterWrite方法进行开启。
+
+##### accessQueue移除
+
+原理和writeQueue一样，此策略通过CacheBuilder的expireAfterAccess方法进行开启。
+
+##### 加载终止
+
+如果已被回收的key对应的value尚处于正在加载的状态，那么将终止加载过程。有意义的实现位于LoadingValueReference
+(其它类均是空实现):
+
+```java
+@Override
+public void notifyNewValue(@Nullable V newValue) {
+	if (newValue != null) {
+		// The pending load was clobbered by a manual write.
+        // Unblock all pending gets, and have them return the new value.
+        set(newValue);
+	} else {
+        // The pending load was removed. Delay notifications until loading completes.
+        oldValue = unset();
+	}
+	// TODO(fry): could also cancel loading if we had a handle on its future
+}
+```
+
+
 
 # get(key)
 

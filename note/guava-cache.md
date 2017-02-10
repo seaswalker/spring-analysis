@@ -533,6 +533,12 @@ boolean expiresAfterWrite() {
 
 此策略可以通过CacheBuilder的expireAfterWrite方法进行开启。
 
+WriteQueue利用了双端队列实现了时间轴的概念，即**每次在队列前段插入新节点**，示意:
+
+>  ----进入时间最短-----Enter-->--D-->--C-->--B-->--A-->--进入时间最久-----
+
+当需要进行回收的时候，只需要从前往后遍历队列，只要找到一个过期的缓存，那么可以保证**此缓存后续的所有缓存都已过期.**
+
 ##### accessQueue移除
 
 原理和writeQueue一样，此策略通过CacheBuilder的expireAfterAccess方法进行开启。
@@ -557,7 +563,110 @@ public void notifyNewValue(@Nullable V newValue) {
 }
 ```
 
+unset方法返回一个占位符对象，此对象用以说明此ValueReference将被加载。
 
+##### 移除算法
+
+真正的移除位于removeEntryFromChain方法中:
+
+```java
+@GuardedBy("this")
+@Nullable
+ReferenceEntry<K, V> removeEntryFromChain(ReferenceEntry<K, V> first, ReferenceEntry<K, V> entry) {
+	int newCount = count;
+	ReferenceEntry<K, V> newFirst = entry.getNext();
+	for (ReferenceEntry<K, V> e = first; e != entry; e = e.getNext()) {
+		ReferenceEntry<K, V> next = copyEntry(e, newFirst);
+        if (next != null) {
+			newFirst = next;
+        } else {
+          	removeCollectedEntry(e);
+          	newCount--;
+        }
+	}
+	this.count = newCount;
+	return newFirst;
+}
+```
+
+移除算法并未采用从前往后遍历的方式，下面以图来说明。
+
+假设链表最初的结构如下所示:
+
+![初始](images/entry_before_remove.png)
+
+处理之后的结构:
+
+![之后](images/entry_after_remove.png)
+
+结合源码看出，**节点移除实际上导致了一条新的链表的创建**，那么为什么不采用直接将2和4连接的方式呢?
+
+WeakEntry部分源码:
+
+```java
+final int hash;
+final ReferenceEntry<K, V> next;
+volatile ValueReference<K, V> valueReference = unset();
+```
+
+可以看出，next指针被定义为final，这样可以保证**即使有读线程在并发(读操作是没有加锁的)地读取，也可以读取到数据，只不过是过期的数据**，这里是CopyOnWrite思想的体现。
+
+#### 过期缓存
+
+expireEntries:
+
+```java
+@GuardedBy("this")
+void expireEntries(long now) {
+  	//recencyQueue和accessQueue区分不清，暂且跳过
+	drainRecencyQueue();
+	ReferenceEntry<K, V> e;
+	while ((e = writeQueue.peek()) != null && map.isExpired(e, now)) {
+		if (!removeEntry(e, e.getHash(), RemovalCause.EXPIRED)) {
+			throw new AssertionError();
+		}
+	}
+	while ((e = accessQueue.peek()) != null && map.isExpired(e, now)) {
+		if (!removeEntry(e, e.getHash(), RemovalCause.EXPIRED)) {
+          	throw new AssertionError();
+        }
+	}
+}
+```
+
+逻辑到这里就很明确了。
+
+### 扩容
+
+相关源码:
+
+```java
+int newCount = this.count + 1;
+if (newCount > this.threshold) { // ensure capacity
+	expand();
+	newCount = this.count + 1;
+}
+```
+
+guava cache扩容仍然采用了ConcurrentHashMap的思想。**扩容是针对Segment进行的，而不是整个Map，这样可以保证一个Segment的扩容不会对其它的Segment访问造成影响。**
+
+**扩容都是在原来的基础上进行两倍扩容**，ConcurrentHashMap针对此特性做出了一定的优化措施，以原长度为16，扩容到32为例:
+
+16的Mask:
+
+ 01111
+
+32的Mask:
+
+11111
+
+也就是说，如果对象的hashCode的高一位是0，那么其在新数组中的位置其实是不变的，这些也就无需复制。
+
+源码不再贴出。
+
+### 设值
+
+。。。
 
 # get(key)
 
@@ -596,11 +705,13 @@ Segment.get简略版源码:
 ```java
 V get(K key, int hash, CacheLoader<? super K, V> loader) throws ExecutionException {
   try {
+    //快速判断
 	if (count != 0) { // read-volatile
-	  // don't call getLiveEntry, which would ignore loading values
+	  //遍历寻找
 	  ReferenceEntry<K, V> e = getEntry(key, hash);
 	  if (e != null) {
 		long now = map.ticker.read();
+        //判断Entry是否已经过期、被回收或是正在加载，如果是，返回null
 		V value = getLiveValue(e, now);
 		if (value != null) {
 		  recordRead(e, now);
@@ -609,11 +720,13 @@ V get(K key, int hash, CacheLoader<? super K, V> loader) throws ExecutionExcepti
 		}
 		ValueReference<K, V> valueReference = e.getValueReference();
 		if (valueReference.isLoading()) {
+          //阻塞等待直到加载完成
 		  return waitForLoadingValue(e, key, valueReference);
 		}
 	  }
 	}
 	// at this point e is either null or expired;
+    //加锁再次遍历或是加载
 	return lockedGetOrLoad(key, hash, loader);
   } catch (ExecutionException ee) {
 	throw ee;
@@ -623,5 +736,33 @@ V get(K key, int hash, CacheLoader<? super K, V> loader) throws ExecutionExcepti
 }
 ```
 
+逻辑注释里已经很清楚了，这里只需要补充一点，scheduleRefresh方法:
 
+```java
+V scheduleRefresh(ReferenceEntry<K, V> entry,K key,int hash,V oldValue,long now,CacheLoader<? super K, V> loader) {
+	if (map.refreshes()
+		&& (now - entry.getWriteTime() > map.refreshNanos)
+        && !entry.getValueReference().isLoading()) {
+		V newValue = refresh(key, hash, loader, true);
+        if (newValue != null) {
+			return newValue;
+		}
+	}
+	return oldValue;
+}
+```
+
+refreshes()方法的条件是refreshNanos > 0，这其实是guava cache提供的自动刷新机制，可以通过CacheBuilder的refreshAfterWrite方法进行设置。
+
+# 参考
+
+很好的两篇博客:
+
+[为什么ConcurrentHashMap可以这么快？](http://www.cnblogs.com/cm4j/p/cc_1.html)
+
+[高并发下数据写入与过期](http://www.cnblogs.com/cm4j/p/cc_2.html)
+
+# 总结
+
+Guava cache其实是在ConcurrentHashMap的基础上加入了过期、权重、自动刷新等特性。
 

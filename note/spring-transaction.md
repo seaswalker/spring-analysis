@@ -317,6 +317,7 @@ protected Object invokeWithinTransaction(Method method, Class<?> targetClass, fi
 	final TransactionAttribute txAttr = getTransactionAttributeSource()
       	.getTransactionAttribute(method, targetClass);
 	final PlatformTransactionManager tm = determineTransactionManager(txAttr);
+  	//得到方法名
 	final String joinpointIdentification = methodIdentification(method, targetClass);
 	if (txAttr == null || !(tm instanceof CallbackPreferringPlatformTransactionManager)) {
 		// Standard transaction demarcation with getTransaction and commit/rollback calls.
@@ -382,3 +383,178 @@ DriverManagerDataSource类图:
 ![DriverManagerDataSource类图](images/DriverManagerDataSource.jpg)
 
 其中CommonDataSource、Wrapper、DataSource均位于javax.sql包下。
+
+### 事务开启
+
+invocation.proceedWithInvocation()便是我们的逻辑，而createTransactionIfNecessary便是在逻辑执行前开启事务。
+
+TransactionAspectSupport.createTransactionIfNecessary:
+
+```java
+protected TransactionInfo createTransactionIfNecessary(
+	PlatformTransactionManager tm, TransactionAttribute txAttr, final String joinpointIdentification) {
+	// If no name specified, apply method identification as transaction name.
+	if (txAttr != null && txAttr.getName() == null) {
+		txAttr = new DelegatingTransactionAttribute(txAttr) {
+			@Override
+			public String getName() {
+				return joinpointIdentification;
+			}
+		};
+	}
+	TransactionStatus status = null;
+	if (txAttr != null) {
+		if (tm != null) {
+			status = tm.getTransaction(txAttr);
+		}
+	}
+	return prepareTransactionInfo(tm, txAttr, joinpointIdentification, status);
+}
+```
+
+此部分的核心逻辑在getTransaction和prepareTransactionInfo方法，源码较长，下面依然按部分整理。
+
+#### 是否已存在事务
+
+目的在于支撑事务的传播性。
+
+源码位于DataSourceTransactionManager.doGetTransaction，核心逻辑在TransactionSynchronizationManager.doGetResource:
+
+```java
+private static Object doGetResource(Object actualKey) {
+	Map<Object, Object> map = resources.get();
+	if (map == null) {
+		return null;
+	}
+	Object value = map.get(actualKey);
+	// Transparently remove ResourceHolder that was marked as void...
+	if (value instanceof ResourceHolder && ((ResourceHolder) value).isVoid()) {
+		map.remove(actualKey);
+		// Remove entire ThreadLocal if empty...
+		if (map.isEmpty()) {
+			resources.remove();
+		}
+		value = null;
+	}
+	return value;
+}
+```
+
+actualKey实际上是DataSource对象，resources是一个ThreadLocal对象，其声明源码:
+
+```java
+private static final ThreadLocal<Map<Object, Object>> resources =
+			new NamedThreadLocal<Map<Object, Object>>("Transactional resources");
+```
+
+从这里可以得出结论:
+
+**是否存在事务指的是在当前线程、当前数据源(DataSource)中是否存在处于活动状态的事务**。
+
+#### 事务已存在
+
+如果检测到已存在事务，那么就要考虑事务的传播特性(行为).此部分源码位于AbstractPlatformTransactionManager.handleExistingTransaction，下面按照不同的传播特性展开。
+
+##### PROPAGATION_NEVER
+
+即当前方法需要在非事务的环境下执行，如果有事务存在，那么抛出异常。相关源码:
+
+```java
+if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NEVER) {
+	throw new IllegalTransactionStateException(
+		"Existing transaction found for transaction marked with propagation 'never'");
+}
+```
+
+##### PROPAGATION_NOT_SUPPORTED
+
+与前者的区别在于，如果有事务存在，那么将事务挂起，而不是抛出异常。
+
+```java
+if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NOT_SUPPORTED) {
+	Object suspendedResources = suspend(transaction);
+	boolean newSynchronization = (getTransactionSynchronization() == SYNCHRONIZATION_ALWAYS);
+	return prepareTransactionStatus(
+		definition, null, false, newSynchronization, debugEnabled, suspendedResources);
+}
+```
+
+###### 事务挂起
+
+此部分的核心在于suspend方法，最终调用TransactionSynchronizationManager.doUnbindResource:
+
+```java
+private static Object doUnbindResource(Object actualKey) {
+	Map<Object, Object> map = resources.get();
+	if (map == null) {
+		return null;
+	}
+	Object value = map.remove(actualKey);
+	// Remove entire ThreadLocal if empty...
+	if (map.isEmpty()) {
+		resources.remove();
+	}
+	// Transparently suppress a ResourceHolder that was marked as void...
+	if (value instanceof ResourceHolder && ((ResourceHolder) value).isVoid()) {
+		value = null;
+	}
+	return value;
+}
+```
+
+可以看出，**所谓的事务挂起其实就是一个移除当前线程、数据源活动事务对象的过程**。
+
+同时注意getTransaction方法返回的是一个TransactionStatus对象，**被挂起的事务的各种状态都被保存在此对象中**。
+
+##### PROPAGATION_REQUIRES_NEW
+
+```java
+if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRES_NEW) {
+	SuspendedResourcesHolder suspendedResources = suspend(transaction);
+	boolean newSynchronization = (getTransactionSynchronization() != SYNCHRONIZATION_NEVER);
+	DefaultTransactionStatus status = newTransactionStatus(
+			definition, transaction, true, newSynchronization, debugEnabled, suspendedResources);
+	doBegin(transaction, definition);
+	prepareSynchronization(status, definition);
+	return status;
+}
+```
+
+可以看出，这其实是一个**挂起当前活动事务并创建新事务的过程**，doBegin方法是事务开启的核心，将在后面进行说明。
+
+##### PROPAGATION_NESTED
+
+其意义:
+
+> PROPAGATION_NESTED 开始一个 "嵌套的" 事务,  它是已经存在事务的一个真正的子事务. 嵌套事务开始执行时,  它将取得一个 savepoint. 如果这个嵌套事务失败, 我们将回滚到此 savepoint. 嵌套事务是外部事务的一部分, 只有外部事务结束后它才会被提交. 
+
+摘自: [解惑 spring 嵌套事务](http://www.iteye.com/topic/35907)
+
+核心源码(忽略JTA部分):
+
+```java
+if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NESTED) {
+	if (useSavepointForNestedTransaction()) {
+		// Create savepoint within existing Spring-managed transaction,
+		// through the SavepointManager API implemented by TransactionStatus.
+		// Usually uses JDBC 3.0 savepoints. Never activates Spring synchronization.
+		DefaultTransactionStatus status =
+			prepareTransactionStatus(definition, transaction, false, false, debugEnabled, null);
+		status.createAndHoldSavepoint();
+		return status;
+	}
+}
+```
+
+关键在于如何创建SavePoint, AbstractTransactionStatus.createAndHoldSavepoint:
+
+```java
+public void createAndHoldSavepoint() throws TransactionException {
+	setSavepoint(getSavepointManager().createSavepoint());
+}
+```
+
+
+
+
+

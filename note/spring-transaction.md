@@ -554,7 +554,20 @@ public void createAndHoldSavepoint() throws TransactionException {
 }
 ```
 
+DefaultTransactionStatus.getSavepointManager:
 
+```java
+@Override
+protected SavepointManager getSavepointManager() {
+	if (!isTransactionSavepointManager()) {
+		throw new NestedTransactionNotSupportedException(
+			"Transaction object [" + getTransaction() + "] does not support savepoints");
+	}
+	return (SavepointManager) getTransaction();
+}
+```
+
+可以看出，SavepointManager实际上从Transaction强转而来，Transaction在Spring都是用Object引用的，那么这到底是个什么东西?
 
 
 

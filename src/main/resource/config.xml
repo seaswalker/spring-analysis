@@ -26,7 +26,10 @@
         <property name="dataSource" ref="dataSource"/>
     </bean>
 
-    <bean class="base.transaction.TransactionBean" />
+    <bean id="nestedBean" class="base.transaction.NestedBean" />
+    <bean class="base.transaction.TransactionBean">
+        <property name="nestedBean" ref="nestedBean" />
+    </bean>
 
     <tx:annotation-driven transaction-manager="transactionManager" mode="proxy"/>
 

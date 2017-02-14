@@ -1,7 +1,10 @@
 package base.transaction;
 
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.Resource;
 
 /**
  * 测试事务.
@@ -11,9 +14,26 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class TransactionBean {
 
-    @Transactional
+    public NestedBean getNestedBean() {
+        return nestedBean;
+    }
+
+    public void setNestedBean(NestedBean nestedBean) {
+        this.nestedBean = nestedBean;
+    }
+
+    private NestedBean nestedBean;
+
+    @Transactional(propagation = Propagation.REQUIRED)
     public void process() {
         System.out.println("事务执行");
+        //nestedBean.nest();
+        nest();
+    }
+
+    @Transactional(propagation = Propagation.NESTED)
+    public void nest() {
+        System.out.println("本类嵌套事务");
     }
 
 }

@@ -569,5 +569,168 @@ protected SavepointManager getSavepointManager() {
 
 可以看出，SavepointManager实际上从Transaction强转而来，Transaction在Spring都是用Object引用的，那么这到底是个什么东西?
 
+###### debug环境搭建
+
+- 安装Mysql数据库(或其它支持jdbc)并正确配置数据库连接.
+
+- 定义两个bean，代表我们的业务逻辑:
+
+  - TransactionBean:
+
+    ```java
+    @Component
+    public class TransactionBean {
+      	private NestedBean nestedBean;
+        public NestedBean getNestedBean() {
+            return nestedBean;
+        }
+        public void setNestedBean(NestedBean nestedBean) {
+            this.nestedBean = nestedBean;
+        }
+      
+        @Transactional(propagation = Propagation.REQUIRED)
+        public void process() {
+            System.out.println("事务执行");
+            nestedBean.nest();
+        }
+    }
+    ```
+
+  - NestedBean:
+
+    ```java
+    @Component
+    public class NestedBean {
+        @Transactional(propagation = Propagation.NESTED)
+        public void nest() {
+            System.out.println("嵌套事务");
+        }
+    }
+    ```
+
+- 配置文件:
+
+  ```xml
+  <bean id="nestedBean" class="base.transaction.NestedBean" />
+  <bean class="base.transaction.TransactionBean">
+  	<property name="nestedBean" ref="nestedBean" />
+  </bean>
+  ```
+
+- 入口:
+
+  ```java
+  public static void main(String[] args) {
+  	ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("config.xml");
+      TransactionBean bean = context.getBean(TransactionBean.class);
+      bean.process();
+  }
+  ```
+
+这样将断点打在合适的位置便可以得到事务对象究竟是什么。
+
+注意:
+
+**nest方法必须在一个单独的业务bean中**，否则对nest的调用并不会导致事务获取的触发。这是由JDK动态代理的实现机制决定的，**调用当前类的方法并不会触发代理逻辑(InvocationHandler)**。
+
+这一点可以运行demo:test.proxy.JDKProxy看出。
+
+运行debug可以发现，**对于DataSourceTransactionManager，事务对象其实是其内部类DataSourceTransactionObject**.
+
+###### 事务对象
+
+ DataSourceTransactionObject的类图如下:
+
+![DataSourceTransactionObject类图](images/DataSourceTransactionObject.jpg)
+
+###### Savepoint
+
+位于java.sql包下，对于Mysql来说，由Mysql驱动提供实现，类图:
+
+![Savepoint类图](images/Savepoint.jpg)
+
+下面来看一下Savepoint到底是如何被创建的。
+
+JdbcTransactionObjectSupport.createSavepoint简略版源码:
+
+```java
+@Override
+public Object createSavepoint() throws TransactionException {
+	ConnectionHolder conHolder = getConnectionHolderForSavepoint();
+	return conHolder.createSavepoint();
+}
+```
+
+ConnectionHolder.createSavepoint:
+
+```java
+public Savepoint createSavepoint() throws SQLException {
+	this.savepointCounter++;
+	return getConnection().setSavepoint(SAVEPOINT_NAME_PREFIX + this.savepointCounter);
+}
+```
+
+我们可以得出这样的结论:
+
+**Savepoint由java SQL标准定义，具体实现由数据库完成**。从mysql的客户端可以直接执行命令`savepoint xx`可以看出这一点。 
+
+##### 其它
+
+略。
+
+#### 事务创建
+
+如果之前不存在事务，那么就需要创建了，核心逻辑位于DataSourceTransactionManager.doBegin:
+
+```java
+@Override
+protected void doBegin(Object transaction, TransactionDefinition definition) {
+  	//此时，txObject不为null，只是其核心的ConnectHolder属性为null
+	DataSourceTransactionObject txObject = (DataSourceTransactionObject) transaction;
+	Connection con = null;
+	if (txObject.getConnectionHolder() == null ||
+			txObject.getConnectionHolder().isSynchronizedWithTransaction()) {
+		Connection newCon = this.dataSource.getConnection();
+      	//获得连接，可以看出ConnectionHolder是对Connection的包装
+		txObject.setConnectionHolder(new ConnectionHolder(newCon), true);
+	}
+	txObject.getConnectionHolder().setSynchronizedWithTransaction(true);
+	con = txObject.getConnectionHolder().getConnection();
+  	//设置是否只读和隔离级别
+	Integer previousIsolationLevel = DataSourceUtils.prepareConnectionForTransaction(con, definition);
+	txObject.setPreviousIsolationLevel(previousIsolationLevel);
+	// Switch to manual commit if necessary. This is very expensive in some JDBC drivers,
+	// so we don't want to do it unnecessarily (for example if we've explicitly
+	// configured the connection pool to set it already).
+	if (con.getAutoCommit()) {
+		txObject.setMustRestoreAutoCommit(true);
+		con.setAutoCommit(false);
+	}
+	txObject.getConnectionHolder().setTransactionActive(true);
+	int timeout = determineTimeout(definition);
+	if (timeout != TransactionDefinition.TIMEOUT_DEFAULT) {
+		txObject.getConnectionHolder().setTimeoutInSeconds(timeout);
+	}
+	// Bind the session holder to the thread.
+	if (txObject.isNewConnectionHolder()) {
+		TransactionSynchronizationManager.bindResource(getDataSource(), txObject.getConnectionHolder());
+	}
+}
+```
+
+到这里便可以得出结论:
+
+**Spring事务的开启实际上是将数据库的自动提交设为false**。
+
+### 事务提交 & 回滚
+
+其实就是对jdbc相应方法的封装，不再展开。
+
+# 总结
+
+事务的本质其实是对数据库自动提交的关闭与开启，传播特性是Spring提出、实现、控制的概念，而隔离级别是对数据库实现的封装。
+
+
+
 
 

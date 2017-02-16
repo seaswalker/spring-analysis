@@ -506,6 +506,23 @@ private static Object doUnbindResource(Object actualKey) {
 
 同时注意getTransaction方法返回的是一个TransactionStatus对象，**被挂起的事务的各种状态都被保存在此对象中**。
 
+那么挂起这个操作到底是如何实现(起作用)的呢?
+
+DataSourceTransactionManager.doSuspend:
+
+```java
+@Override
+protected Object doSuspend(Object transaction) {
+	DataSourceTransactionObject txObject = (DataSourceTransactionObject) transaction;
+	txObject.setConnectionHolder(null);
+	ConnectionHolder conHolder = (ConnectionHolder)
+			TransactionSynchronizationManager.unbindResource(this.dataSource);
+	return conHolder;
+}
+```
+
+其实玄机就在于将ConnectionHolder设为null这一行，因为**一个ConnectionHolder对象就代表了一个数据库连接，将ConnectionHolder设为null就意味着我们下次要使用连接时，将重新从连接池获取，而新的连接的自动提交是为true的**。
+
 ##### PROPAGATION_REQUIRES_NEW
 
 ```java

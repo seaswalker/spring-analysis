@@ -26,7 +26,7 @@ public void init() {
 	registerBeanDefinitionParser("advice", new TxAdviceBeanDefinitionParser());
 	registerBeanDefinitionParser("annotation-driven", 
         new AnnotationDrivenBeanDefinitionParser());
-	registerBeanDefinitionParser("jta-transaction-manager", 										new JtaTransactionManagerBeanDefinitionParser());
+	registerBeanDefinitionParser("jta-transaction-manager", new JtaTransactionManagerBeanDefinitionParser());
 }
 ```
 

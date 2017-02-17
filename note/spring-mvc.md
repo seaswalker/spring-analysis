@@ -322,3 +322,31 @@ protected void initStrategies(ApplicationContext context) {
 ```
 
 显然，这里就是spring-mvc的核心了。
+
+### 文件上传支持
+
+initMultipartResolver核心源码:
+
+```java
+private void initMultipartResolver(ApplicationContext context) {
+	try {
+		this.multipartResolver = context.getBean(MULTIPART_RESOLVER_BEAN_NAME, MultipartResolver.class);
+	} catch (NoSuchBeanDefinitionException ex) {
+		// Default is no multipart resolver.
+		this.multipartResolver = null;
+	}
+}
+```
+
+MultipartResolver用于开启Spring MVC文件上传功能，其类图:
+
+![MultipartResolver类图](images/MultipartResolver.jpg)
+
+也就是说，如果我们要使用文件上传功能，须在容器中注册一个MultipartResolver bean。当然，默认是没有的。
+
+### 地区解析器
+
+LocaleResolver接口定义了Spring MVC如何获取客户端(浏览器)的地区，initLocaleResolver方法在容器中寻找此bean，如果没有，注册AcceptHeaderLocaleResolver，即根据request的请求头**Accept-Language**获取地区。
+
+spring-mvc采用了属性文件的方式配置默认策略(即bean)，此文件位于spring-mvc的jar包的org.springframework.web.servlet下。
+

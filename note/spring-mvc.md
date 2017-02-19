@@ -350,3 +350,84 @@ LocaleResolver接口定义了Spring MVC如何获取客户端(浏览器)的地区
 
 spring-mvc采用了属性文件的方式配置默认策略(即bean)，此文件位于spring-mvc的jar包的org.springframework.web.servlet下。
 
+### 主题解析器
+
+ThemeResolver接口配合Spring标签库使用可以通过动态决定使用的css以及图片的方式达到换肤的效果，其类图:
+
+![ThemeResolver类图](images/ThemeResolver.jpg)
+
+如果容器中不存在叫做themeResolver的bean，initThemeResolver方法将向容器中注册FixedThemeResolver，此bean只能提供一套默认的主题，名为theme。
+
+### HandlerMapping检查
+
+initHandlerMappings方法用于确保容器中**至少含有一个HandlerMapping对象**。从前面配置解析-注解驱动一节中可以看出，注解驱动导致已经注册了两个此对象。
+
+如果没有开启注解驱动，那么将会使用默认的HandlerMapping，相关源码:
+
+```java
+if (this.handlerMappings == null) {
+	this.handlerMappings = getDefaultStrategies(context, HandlerMapping.class);
+	if (logger.isDebugEnabled()) {
+		logger.debug("No HandlerMappings found in servlet '" + getServletName() + "': using default");
+	}
+}
+```
+
+前面提到了，默认的策略由DispatcherServlet.properties决定，**目前是BeanNameUrlHandlerMapping和DefaultAnnotationHandlerMapping**。
+
+### HandlerAdapter检查
+
+套路和上面完全一样，默认使用HttpRequestHandlerAdapter、SimpleControllerHandlerAdapter和AnnotationMethodHandlerAdapter。
+
+### HandlerExceptionResolver检查
+
+套路和上面完全一样，默认使用AnnotationMethodHandlerExceptionResolver、ResponseStatusExceptionResolver、DefaultHandlerExceptionResolver。
+
+### RequestToViewNameTranslator
+
+initRequestToViewNameTranslator方法回向容器中注册一个DefaultRequestToViewNameTranslator对象，此接口用以完成从HttpServletRequest到视图名的解析，其使用场景是**给定的URL无法匹配任何控制器时**。
+
+DefaultRequestToViewNameTranslator的转换例子:
+
+http://localhost:8080/gamecast/display.html -> display(视图)
+
+其类图:
+
+![RequestToViewNameTranslator类图](images/RequestToViewNameTranslator.jpg)
+
+### ViewResolver检查
+
+熟悉的套路，默认使用InternalResourceViewResolver。
+
+### FlashMapManager
+
+initFlashMapManager方法会向容器注册SessionFlashMapManager对象，类图:
+
+![FlashMapManager类图](images/FlashMapManager.jpg)
+
+此接口和FlashMap搭配使用，用于在**请求重定向时保存/传递参数**。
+
+# 请求响应
+
+我们先来看一下入口在哪。众所周知，Servlet标准定义了所有请求先由service方法处理，如果是get或post方法，那么再交由doGet或是doPost方法处理。
+
+FrameworkServlet覆盖了service方法:
+
+```java
+@Override
+protected void service(HttpServletRequest request, HttpServletResponse response) {
+	HttpMethod httpMethod = HttpMethod.resolve(request.getMethod());
+	if (HttpMethod.PATCH == httpMethod || httpMethod == null) {
+		processRequest(request, response);
+	} else {
+		super.service(request, response);
+	}
+}
+```
+
+Spring要覆盖此方法的目的在于拦截PATCH请求，PATCH请求与PUT类似，不同在于PATCH是局部更新，而后者是全部更新。可以参考:
+
+[PATCH和PUT方法的区别？](https://segmentfault.com/q/1010000005685904)
+
+FrameworkServlet同样也覆盖了doGet和doPost方法，两者只是调用processRequest方法。
+

@@ -407,6 +407,73 @@ initFlashMapManager方法会向容器注册SessionFlashMapManager对象，类图
 
 此接口和FlashMap搭配使用，用于在**请求重定向时保存/传递参数**。
 
+## HandlerMapping初始化
+
+此接口用以根据请求的URL寻找合适的处理器。从前面配置解析一节可以看出，我们的容器中有三个HandlerMapping实现，下面进行分别说明。
+
+### RequestMappingHandlerMapping
+
+此实现根据@Controller和@RequestMapping注解完成解析。类图(忽略部分接口):
+
+![RequestMappingHandlerMapping类图](images/RequestMappingHandlerMapping.jpg)
+
+初始化的入口位于AbstractHandlerMethodMapping的afterPropertiesSet方法，afterPropertiesSet调用了initHandlerMethods:
+
+```java
+protected void initHandlerMethods() {
+  	//获取容器中所有的bean
+	String[] beanNames = (this.detectHandlerMethodsInAncestorContexts ?
+			BeanFactoryUtils.beanNamesForTypeIncludingAncestors(getApplicationContext(), Object.class) 			   :getApplicationContext().getBeanNamesForType(Object.class));
+	for (String beanName : beanNames) {
+		if (!beanName.startsWith(SCOPED_TARGET_NAME_PREFIX)) {
+			Class<?> beanType = null;
+			beanType = getApplicationContext().getType(beanName);
+        	 //isHandler方法的原理:
+             //判断类上有没有@Controller注解或者是@RequestMapping注解
+			if (beanType != null && isHandler(beanType)) {
+				detectHandlerMethods(beanName);
+			}
+		}
+	}
+	handlerMethodsInitialized(getHandlerMethods());
+}
+```
+
+detectHandlerMethods方法将反射遍历类中所有的public方法，如果方法上含有@RequestMapping注解，那么将方法上的路径与类上的基础路径(如果有)进行合并，之后将映射(匹配关系)注册到MappingRegistry中。
+
+注意，**类上的@RequestMapping注解只能作为基路径存在，也就是说，如果类里面没有任何的方法级@RequestMapping注解，那么类上的注解是没有意义的**。这一点可以从实验和源码上得到证实。
+
+下面我们关注一下映射关系是如何保存(注册)的。
+
+内部类AbstractHandlerMethodMapping.MappingRegistry是映射的载体，类图:
+
+![MappingRegistry类图](images/MappingRegistry.jpg)
+
+其register方法简略版源码:
+
+```java
+public void register(T mapping, Object handler, Method method) {
+	HandlerMethod handlerMethod = createHandlerMethod(handler, method);
+	this.mappingLookup.put(mapping, handlerMethod);
+	List<String> directUrls = getDirectUrls(mapping);
+	for (String url : directUrls) {
+		this.urlLookup.add(url, mapping);
+	}
+	String name = null;
+	if (getNamingStrategy() != null) {
+		name = getNamingStrategy().getName(handlerMethod, mapping);
+		addMappingName(name, handlerMethod);
+	}
+	CorsConfiguration corsConfig = initCorsConfiguration(handler, method, mapping);
+	if (corsConfig != null) {
+		this.corsLookup.put(handlerMethod, corsConfig);
+	}
+	this.registry.put(mapping, new MappingRegistration<T>(mapping, handlerMethod, directUrls, name));
+}
+```
+
+
+
 # 请求响应
 
 我们先来看一下入口在哪。众所周知，Servlet标准定义了所有请求先由service方法处理，如果是get或post方法，那么再交由doGet或是doPost方法处理。
@@ -430,4 +497,15 @@ Spring要覆盖此方法的目的在于拦截PATCH请求，PATCH请求与PUT类�
 [PATCH和PUT方法的区别？](https://segmentfault.com/q/1010000005685904)
 
 FrameworkServlet同样也覆盖了doGet和doPost方法，两者只是调用processRequest方法。
+
+## 请求上下文
+
+Spring MVC会在请求分发之前进行上下文的准备工作，含两部分:
+
+1. 将地区(Locale)和请求属性以ThreadLocal的方法与当前线程进行关联，分别可以通过LocaleContextHolder和RequestContextHolder进行获取。
+2. 将WebApplicationContext、FlashMap等组件放入到Request属性中。
+
+## 请求分发
+
+
 

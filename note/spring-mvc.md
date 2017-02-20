@@ -409,7 +409,7 @@ initFlashMapManager方法会向容器注册SessionFlashMapManager对象，类图
 
 ## HandlerMapping初始化
 
-此接口用以根据请求的URL寻找合适的处理器。从前面配置解析一节可以看出，我们的容器中有三个HandlerMapping实现，下面进行分别说明。
+此接口用以根据请求的URL寻找合适的处理器。从前面配置解析一节可以看出，我们的容器中有三个HandlerMapping实现，下面以RequestMappingHandlerMapping位代表进行说明。
 
 ### RequestMappingHandlerMapping
 
@@ -435,6 +435,7 @@ protected void initHandlerMethods() {
 			}
 		}
 	}
+  	//空实现
 	handlerMethodsInitialized(getHandlerMethods());
 }
 ```
@@ -453,6 +454,7 @@ detectHandlerMethods方法将反射遍历类中所有的public方法，如果方
 
 ```java
 public void register(T mapping, Object handler, Method method) {
+  	//包装bean和方法
 	HandlerMethod handlerMethod = createHandlerMethod(handler, method);
 	this.mappingLookup.put(mapping, handlerMethod);
 	List<String> directUrls = getDirectUrls(mapping);
@@ -472,7 +474,113 @@ public void register(T mapping, Object handler, Method method) {
 }
 ```
 
+mapping其实是一个RequestMappingInfo对象，可以将其看做是**@RequestMapping注解各种属性的一个封装**。最终由RequestMappingInfo.createRequestMappingInfo方法创建，源码:
 
+```java
+protected RequestMappingInfo createRequestMappingInfo(
+		RequestMapping requestMapping, RequestCondition<?> customCondition) {
+	return RequestMappingInfo
+			.paths(resolveEmbeddedValuesInPatterns(requestMapping.path()))
+			.methods(requestMapping.method())
+			.params(requestMapping.params())
+			.headers(requestMapping.headers())
+			.consumes(requestMapping.consumes())
+			.produces(requestMapping.produces())
+			.mappingName(requestMapping.name())
+			.customCondition(customCondition)
+			.options(this.config)
+			.build();
+}
+```
+
+这就很明显了，具体每种属性什么意义可以参考@RequestMapping源码。
+
+register方法中urlLookup其实就是将paths属性中的每个path都与处理器做映射。
+
+getNamingStrategy方法得到的是一个HandlerMethodMappingNamingStrategy接口的实例，此接口用以根据HandlerMethod得到一个名字，类图:
+
+![HandlerMethodMappingNamingStrategy类图](images/HandlerMethodMappingNamingStrategy.jpg)
+
+比如对于我们的控制器,SimpleController.echo方法，最终得到的名字将是SC#echo。
+
+#### 跨域请求
+
+spring-mvc自4.2开启加入了跨域请求Cors的支持，主要有两种配置方式:
+
+- xml:
+
+  ```xml
+  <mvc:cors>
+  	<mvc:mapping path=""/>
+  </mvc:cors>
+  ```
+
+- @CrossOrigin注解。
+
+Cors的原理可以参考:
+
+[探讨跨域请求资源的几种方式](http://www.cnblogs.com/dojo-lzz/p/4265637.html)
+
+而initCorsConfiguration方法的作用便是将@CrossOrigin注解的各种属性封装在CorsConfiguration中。
+
+## HandlerAdapter初始化
+
+同样，我们以RequestMappingHandlerAdapter为例进行说明，类图:
+
+![RequestMappingHandlerAdapter类图](images/RequestMappingHandlerAdapter.jpg)
+
+显然，入口在afterPropertiesSet方法:
+
+```java
+@Override
+public void afterPropertiesSet() {
+	// Do this first, it may add ResponseBody advice beans
+	initControllerAdviceCache();
+	if (this.argumentResolvers == null) {
+		List<HandlerMethodArgumentResolver> resolvers = getDefaultArgumentResolvers();
+		this.argumentResolvers = new HandlerMethodArgumentResolverComposite()
+			.addResolvers(resolvers);
+	}
+	if (this.initBinderArgumentResolvers == null) {
+		List<HandlerMethodArgumentResolver> resolvers = getDefaultInitBinderArgumentResolvers();
+		this.initBinderArgumentResolvers = new HandlerMethodArgumentResolverComposite()
+			.addResolvers(resolvers);
+	}
+	if (this.returnValueHandlers == null) {
+		List<HandlerMethodReturnValueHandler> handlers = getDefaultReturnValueHandlers();
+		this.returnValueHandlers = new HandlerMethodReturnValueHandlerComposite()
+			.addHandlers(handlers);
+	}
+}
+```
+
+### @ControllerAdvice
+
+initControllerAdviceCache方法用以解析并存储标注了@ControllerAdvice的bean，这东西是干什么的参考：
+
+[Spring3.2新注解@ControllerAdvice](http://jinnianshilongnian.iteye.com/blog/1866350)
+
+### 参数解析器
+
+HandlerMethodArgumentResolver即参数解析器，负责从request中解析、得到Controller方法所需的参数。afterPropertiesSet方法设置了一组默认的解析器。具体是哪些参考getDefaultArgumentResolvers方法。类图:
+
+![HandlerMethodArgumentResolver类图](images/HandlerMethodArgumentResolver.jpg)
+
+### @InitBinder支持
+
+此注解定义的其实是自定义类型转换器。使用方法参考:
+
+[springMVC @initBinder 使用](http://blog.csdn.net/songzaiblog/article/details/49757253)
+
+getDefaultInitBinderArgumentResolvers返回了一组默认使用的转换器，不过其实这里的转换器和上面的参数解析器其实是一个类型的，这里留个坑。
+
+### 返回结果解析器
+
+HandlerMethodReturnValueHandler接口用以处理方法调用(Controller方法)的返回值，类图:
+
+![HandlerMethodReturnValueHandler类图](images/HandlerMethodReturnValueHandler.jpg)
+
+getDefaultReturnValueHandlers方法便返回了一坨这东西。
 
 # 请求响应
 
@@ -507,5 +615,53 @@ Spring MVC会在请求分发之前进行上下文的准备工作，含两部分:
 
 ## 请求分发
 
+DispatcherServlet.doDispatch简略版源码:
 
+```java
+protected void doDispatch(HttpServletRequest request, HttpServletResponse response) {
+	HandlerExecutionChain mappedHandler = getHandler(processedRequest);
+	HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler());
+	mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
+	applyDefaultViewName(processedRequest, mv);
+	mappedHandler.applyPostHandle(processedRequest, response, mv);
+	processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException);
+}
+```
 
+### 处理器查找
+
+即为请求寻找合适的Controller的过程。DispatcherServlet.getHandler:
+
+```java
+protected HandlerExecutionChain getHandler(HttpServletRequest request) {
+	for (HandlerMapping hm : this.handlerMappings) {
+		HandlerExecutionChain handler = hm.getHandler(request);
+		if (handler != null) {
+			return handler;
+		}
+	}
+	return null;
+}
+```
+
+从这里可以看出，寻找处理器实际上委托给HandlerMapping实现，寻找的过程便是遍历所有的HandlerMapping进行查找，**一旦找到，那么不再继续进行遍历**。也就是说HandlerMapping之间有优先级的概念，而根据AnnotationDrivenBeanDefinitionParser的注释，RequestMappingHandlerMapping其实有最高的优先级。
+
+AbstractHandlerMapping.getHandler:
+
+```java
+@Override
+public final HandlerExecutionChain getHandler(HttpServletRequest request) throws Exception {
+	Object handler = getHandlerInternal(request);
+	HandlerExecutionChain executionChain = getHandlerExecutionChain(handler, request);
+	if (CorsUtils.isCorsRequest(request)) {
+		CorsConfiguration globalConfig = this.corsConfigSource.getCorsConfiguration(request);
+		CorsConfiguration handlerConfig = getCorsConfiguration(handler, request);
+		CorsConfiguration config = (globalConfig != null ? 
+			globalConfig.combine(handlerConfig) : handlerConfig);
+		executionChain = getCorsHandlerExecutionChain(request, executionChain, config);
+	}
+	return executionChain;
+}
+```
+
+getHandlerInternal方法便是根据url进行查找的过程，可以参见MVC初始化-HandlerMapping初始化一节。下面重点是执行链的生成。

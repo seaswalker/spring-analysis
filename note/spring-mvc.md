@@ -417,7 +417,7 @@ initFlashMapManager方法会向容器注册SessionFlashMapManager对象，类图
 
 ![RequestMappingHandlerMapping类图](images/RequestMappingHandlerMapping.jpg)
 
-初始化的入口位于AbstractHandlerMethodMapping的afterPropertiesSet方法，afterPropertiesSet调用了initHandlerMethods:
+初始化的入口位于AbstractHandlerMethodMapping的afterPropertiesSet方法和AbstractHandlerMapping的initApplicationContext方法，afterPropertiesSet调用了initHandlerMethods:
 
 ```java
 protected void initHandlerMethods() {
@@ -522,6 +522,21 @@ Cors的原理可以参考:
 [探讨跨域请求资源的几种方式](http://www.cnblogs.com/dojo-lzz/p/4265637.html)
 
 而initCorsConfiguration方法的作用便是将@CrossOrigin注解的各种属性封装在CorsConfiguration中。
+
+#### 拦截器初始化
+
+AbstractHandlerMapping.initApplicationContext:
+
+```java
+@Override
+protected void initApplicationContext() throws BeansException {
+	detectMappedInterceptors(this.adaptedInterceptors);
+}
+```
+
+作用就是从容器中获取所有MappedInterceptor bean并放到adaptedInterceptors中，前面提到过了，我们使用mvc:interceptor定义的拦截器其实就是MappedInterceptor对象。类图:
+
+![MappedInterceptor类图](images/MappedInterceptor.jpg)
 
 ## HandlerAdapter初始化
 
@@ -653,6 +668,7 @@ AbstractHandlerMapping.getHandler:
 public final HandlerExecutionChain getHandler(HttpServletRequest request) throws Exception {
 	Object handler = getHandlerInternal(request);
 	HandlerExecutionChain executionChain = getHandlerExecutionChain(handler, request);
+  	//判断请求头中是否有ORIGIN字段
 	if (CorsUtils.isCorsRequest(request)) {
 		CorsConfiguration globalConfig = this.corsConfigSource.getCorsConfiguration(request);
 		CorsConfiguration handlerConfig = getCorsConfiguration(handler, request);
@@ -665,3 +681,64 @@ public final HandlerExecutionChain getHandler(HttpServletRequest request) throws
 ```
 
 getHandlerInternal方法便是根据url进行查找的过程，可以参见MVC初始化-HandlerMapping初始化一节。下面重点是执行链的生成。
+
+getHandlerExecutionChain方法的原理就是从adaptedInterceptors中获得所有可以适配当前请求URL的MappedInterceptor并将其添加到HandlerExecutionChain的拦截器列表中。拦截器的顺序其实就是我们定义/注册的顺序。
+
+从getCorsHandlerExecutionChain的源码中可以看出，对于跨域请求其实是向调用链插入了一个CorsInterceptor。
+
+### 适配器查找
+
+DispatcherServlet.getHandlerAdapter:
+
+```java
+protected HandlerAdapter getHandlerAdapter(Object handler) {
+	for (HandlerAdapter ha : this.handlerAdapters) {
+		if (ha.supports(handler)) {
+			return ha;
+		}
+	}
+}
+```
+
+从前面配置解析-注解驱动可以看出，第一个适配器是RequestMappingHandlerAdapter，而其support方法直接返回true，这就导致了使用的适配器总是这一个。
+
+## 请求处理
+
+RequestMappingHandlerAdapter.handleInternal:
+
+```java
+@Override
+protected ModelAndView handleInternal(HttpServletRequest request,
+		HttpServletResponse response, HandlerMethod handlerMethod){
+	ModelAndView mav;
+	// Execute invokeHandlerMethod in synchronized block if required.
+	if (this.synchronizeOnSession) {
+		HttpSession session = request.getSession(false);
+		if (session != null) {
+			Object mutex = WebUtils.getSessionMutex(session);
+			synchronized (mutex) {
+				mav = invokeHandlerMethod(request, response, handlerMethod);
+			}
+		} else {
+			// No HttpSession available -> no mutex necessary
+			mav = invokeHandlerMethod(request, response, handlerMethod);
+		}
+	} else {
+		// No synchronization on session demanded at all...
+		mav = invokeHandlerMethod(request, response, handlerMethod);
+	}
+	if (!response.containsHeader(HEADER_CACHE_CONTROL)) {
+		if (getSessionAttributesHandler(handlerMethod).hasSessionAttributes()) {
+			applyCacheSeconds(response, this.cacheSecondsForSessionAttributeHandlers);
+		}
+		else {
+			prepareResponse(response);
+		}
+	}
+	return mav;
+}
+```
+
+### Session同步
+
+可以看出，如果开启了synchronizeOnSession，那么**同一个session的请求将会串行执行**，这一选项默认是关闭的，当然我们可以通过注入的方式进行改变。

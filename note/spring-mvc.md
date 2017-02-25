@@ -742,3 +742,221 @@ protected ModelAndView handleInternal(HttpServletRequest request,
 ### Session同步
 
 可以看出，如果开启了synchronizeOnSession，那么**同一个session的请求将会串行执行**，这一选项默认是关闭的，当然我们可以通过注入的方式进行改变。
+
+### 参数解析
+
+#### 策略模式
+
+正如前面HandlerAdapter初始化-参数解析器一节提到的，HandlerAdapter内部含有一组解析器负责对各类型的参数进行解析。下面我们就常用的自定义参数和Model为例进行说明。
+
+#### 自定义参数
+
+解析由RequestParamMethodArgumentResolver完成。
+
+supportsParameter方法决定了一个解析器可以解析的参数类型，该解析器支持@RequestParam标准的参数或是**简单类型**的参数，具体参见其注释。
+
+忽略复杂的调用关系，最核心的实现位于resolveName方法，部分源码:
+
+```java
+@Override
+protected Object resolveName(String name, MethodParameter parameter, NativeWebRequest request) {
+	if (arg == null) {
+		String[] paramValues = request.getParameterValues(name);
+		if (paramValues != null) {
+			arg = (paramValues.length == 1 ? paramValues[0] : paramValues);
+		}
+	}
+	return arg;
+}
+```
+
+name就是方法的参数名，可以看出，参数解析**就是根据参数名去request查找对应属性的过程**，在这里参数类型并没有起什么作用。
+
+#### Model
+
+解析由ModelMethodProcessor完成。
+
+supportsParameter方法很简单:
+
+```java
+@Override
+public boolean supportsParameter(MethodParameter parameter) {
+	return Model.class.isAssignableFrom(parameter.getParameterType());
+}
+```
+
+很直白了。
+
+resolveArgument：
+
+```java
+@Override
+public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
+	NativeWebRequest webRequest, WebDataBinderFactory binderFactory) throws Exception {
+	return mavContainer.getModel();
+}
+```
+
+忽略各种调用关系，**Model其实是一个BindingAwareModelMap对象，且每次请求(需要注入Model的前提下)都有一个新的该对象生成**。类图:
+
+![BindingAwareModelMap类图](images/BindingAwareModelMap.jpg)
+
+#### 总结
+
+我们可以通过实现HandlerMethodArgumentResolver接口并将其注册容器的方式实现自定义参数类型的解析。
+
+### 返回值解析
+
+套路和上面是一样的，通常情况，我们返回的其实是view名，负责处理的是ViewNameMethodReturnValueHandler，
+
+supportsReturnType方法:
+
+```java
+@Override
+public boolean supportsReturnType(MethodParameter returnType) {
+	Class<?> paramType = returnType.getParameterType();
+	return (void.class == paramType || CharSequence.class.isAssignableFrom(paramType));
+}
+```
+
+handleReturnValue:
+
+```java
+@Override
+public void handleReturnValue(Object returnValue, MethodParameter returnType,
+		ModelAndViewContainer mavContainer, NativeWebRequest webRequest) {
+	if (returnValue instanceof CharSequence) {
+		String viewName = returnValue.toString();
+		mavContainer.setViewName(viewName);
+      	 // 判断的依据: 是否以redirect:开头
+		if (isRedirectViewName(viewName)) {
+			mavContainer.setRedirectModelScenario(true);
+		}
+	}
+}
+```
+
+可见这里并没有进行实际的处理，只是解析得到了最终的视图名称。
+
+### 视图渲染
+
+由DispatcherServlet的processDispatchResult方法完成，源码:
+
+```java
+private void processDispatchResult(HttpServletRequest request, HttpServletResponse response,
+		HandlerExecutionChain mappedHandler, ModelAndView mv, Exception exception) {
+	boolean errorView = false;
+	if (exception != null) {
+      	 //一般不会到这个分支
+		if (exception instanceof ModelAndViewDefiningException) {
+			mv = ((ModelAndViewDefiningException) exception).getModelAndView();
+		} else {
+			Object handler = (mappedHandler != null ? mappedHandler.getHandler() : null);
+			mv = processHandlerException(request, response, handler, exception);
+			errorView = (mv != null);
+		}
+	}
+	// Did the handler return a view to render?
+	if (mv != null && !mv.wasCleared()) {
+		render(mv, request, response);
+		if (errorView) {
+			WebUtils.clearErrorRequestAttributes(request);
+		}
+	}
+}
+```
+
+可以看出，处理**根据是否抛出异常分为了两种情况**。
+
+如果抛出了异常，那么processHandlerException方法将会遍历所有的HandlerExceptionResolver实例，默认有哪些参考MVC初始化-HandlerExceptionResolver检查一节。默认的处理器用于改变响应状态码、调用标注了@ExceptionHandler的bean进行处理，如果没有@ExceptionHandler的bean或是不能处理此类异常，那么就会导致ModelAndView始终为null，最终Spring MVC将异常向上抛给Tomcat，然后Tomcat就会把堆栈打印出来。
+
+如果我们想将其定向到指定的错误页面，可以这样配置:
+
+```xml
+<bean class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
+	<property name="defaultErrorView" value="error"></property>
+</bean>
+```
+
+此处理器会返回一个非空的ModelAndView。
+
+#### ModelAndView
+
+回过头来看一下这到底是个什么东西。类图:
+
+![ModelAndView类图](images/ModelAndView.jpg)
+
+很直白。
+
+怎么生成的。RequestMappingHandlerAdapter.getModelAndView相关源码:
+
+```java
+ModelMap model = mavContainer.getModel();
+ModelAndView mav = new ModelAndView(mavContainer.getViewName(), model, mavContainer.getStatus());
+```
+
+#### 渲染
+
+DispatcherServlet.render简略版源码:
+
+```java
+protected void render(ModelAndView mv, HttpServletRequest request, HttpServletResponse response) {
+	Locale locale = this.localeResolver.resolveLocale(request);
+	response.setLocale(locale);
+	View view;
+  	//判断依据: 是否是String类型
+	if (mv.isReference()) {
+		// We need to resolve the view name.
+		view = resolveViewName(mv.getViewName(), mv.getModelInternal(), locale, request);
+	} else {
+		// No need to lookup: the ModelAndView object contains the actual View object.
+		view = mv.getView();
+	}
+	if (mv.getStatus() != null) {
+		response.setStatus(mv.getStatus().value());
+	}
+	view.render(mv.getModelInternal(), request, response);
+}
+```
+
+resolveViewName方法将会遍历所有的ViewResolver bean，只要有一个解析的结果(View)不为空，即停止遍历。根据MVC初始化-ViewResolver检查一节和我们的配置文件可知，容器中有两个ViewResolver ，分别是: InternalResourceViewResolver和UrlBasedViewResolver。
+
+##### ViewResolver
+
+类图(忽略实现类):
+
+![ViewResolver类图](images/ViewResolver.jpg)
+
+resolveViewName方法的源码不再贴出，其实只做了一件事: 用反射创建并初始化我们指定的View，根据我们的配置，就是JstlView。
+
+##### View
+
+类图:
+
+![JstlView类图](images/JstlView.jpg)
+
+渲染的核心逻辑位于InternalResourceView.renderMergedOutputModel，简略版源码:
+
+```java
+@Override
+protected void renderMergedOutputModel(
+		Map<String, Object> model, HttpServletRequest request, HttpServletResponse response) {
+  	// 将Model中的属性设置的request中
+	exposeModelAsRequestAttributes(model, request);
+	// 获取资源(jsp)路径
+	String dispatcherPath = prepareForRendering(request, response);
+	// Obtain a RequestDispatcher for the target resource (typically a JSP).
+	RequestDispatcher rd = getRequestDispatcher(request, dispatcherPath);
+	// If already included or response already committed, perform include, else forward.
+	if (useInclude(request, response)) {
+		response.setContentType(getContentType());
+		rd.include(request, response);
+	} else {
+		// Note: The forwarded resource is supposed to determine the content type itself.
+		rd.forward(request, response);
+	}
+}
+```
+
+可以看出，对jsp来说，所谓的渲染其实就是**将Model中的属性设置到Request，再利用原生Servlet RequestDispatcher API进行转发的过程**。
+

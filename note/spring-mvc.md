@@ -4,7 +4,7 @@ spring-mvc的核心便是DispatcherServlet，所以初始化也是围绕其展�
 
 ![DispatcherServlet类图](images/DispatcherServlet.jpg)
 
-Servlet标准定义了init方法是其声明周期的初始化方法。
+Servlet标准定义了init方法是其生命周期的初始化方法。
 
 HttpServletBean.init:
 

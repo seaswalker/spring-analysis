@@ -5,9 +5,9 @@ aop部分的解析器由AopNamespaceHandler注册，其init方法:
 ```java
 @Override
 public void init() {
-	registerBeanDefinitionParser("config", new ConfigBeanDefinitionParser());
-	registerBeanDefinitionParser("aspectj-autoproxy", new AspectJAutoProxyBeanDefinitionParser());
-	registerBeanDefinitionDecorator("scoped-proxy", new ScopedProxyBeanDefinitionDecorator());
+    registerBeanDefinitionParser("config", new ConfigBeanDefinitionParser());
+    registerBeanDefinitionParser("aspectj-autoproxy", new AspectJAutoProxyBeanDefinitionParser());
+    registerBeanDefinitionDecorator("scoped-proxy", new ScopedProxyBeanDefinitionDecorator());
 }
 ```
 
@@ -17,9 +17,9 @@ public void init() {
 
 ```xml
 <aop:config>
-	<aop:pointcut expression="execution(* exam.service..*.*(..))" id="transaction"/>
-	<aop:advisor advice-ref="txAdvice" pointcut-ref="transaction"/>
-  	<aop:aspect ref="" />
+    <aop:pointcut expression="execution(* exam.service..*.*(..))" id="transaction"/>
+    <aop:advisor advice-ref="txAdvice" pointcut-ref="transaction"/>
+    <aop:aspect ref="" />
 </aop:config>
 ```
 
@@ -28,25 +28,25 @@ ConfigBeanDefinitionParser.parse:
 ```java
 @Override
 public BeanDefinition parse(Element element, ParserContext parserContext) {
-	CompositeComponentDefinition compositeDef =
-			new CompositeComponentDefinition(element.getTagName(), 
-			parserContext.extractSource(element));
-	parserContext.pushContainingComponent(compositeDef);
-  	// 是否生成代理类
-	configureAutoProxyCreator(parserContext, element);
-	List<Element> childElts = DomUtils.getChildElements(element);
-	for (Element elt: childElts) {
-		String localName = parserContext.getDelegate().getLocalName(elt);
-		if (POINTCUT.equals(localName)) {
-			parsePointcut(elt, parserContext);
-		} else if (ADVISOR.equals(localName)) {
-			parseAdvisor(elt, parserContext);
-		} else if (ASPECT.equals(localName)) {
-			parseAspect(elt, parserContext);
-		}
-	}
-	parserContext.popAndRegisterContainingComponent();
-	return null;
+    CompositeComponentDefinition compositeDef =
+            new CompositeComponentDefinition(element.getTagName(), 
+            parserContext.extractSource(element));
+    parserContext.pushContainingComponent(compositeDef);
+    // 是否生成代理类
+    configureAutoProxyCreator(parserContext, element);
+    List<Element> childElts = DomUtils.getChildElements(element);
+    for (Element elt: childElts) {
+        String localName = parserContext.getDelegate().getLocalName(elt);
+        if (POINTCUT.equals(localName)) {
+            parsePointcut(elt, parserContext);
+        } else if (ADVISOR.equals(localName)) {
+            parseAdvisor(elt, parserContext);
+        } else if (ASPECT.equals(localName)) {
+            parseAspect(elt, parserContext);
+        }
+    }
+    parserContext.popAndRegisterContainingComponent();
+    return null;
 }
 ```
 
@@ -92,16 +92,16 @@ advice-ref是必须的属性，**并且这里的advice必须实现org.aopallianc
 
 ```xml
 <tx:advice id="txAdvice" transaction-manager="transactionManager">
-	<tx:attributes>
-		<tx:method name="get*" read-only="true" propagation="NOT_SUPPORTED"/>
-		<tx:method name="find*" read-only="true" propagation="NOT_SUPPORTED"/>
-		<tx:method name="*" propagation="REQUIRED"/>
-	</tx:attributes>
+    <tx:attributes>
+        <tx:method name="get*" read-only="true" propagation="NOT_SUPPORTED"/>
+        <tx:method name="find*" read-only="true" propagation="NOT_SUPPORTED"/>
+        <tx:method name="*" propagation="REQUIRED"/>
+    </tx:attributes>
 </tx:advice>
 
 <aop:config>
-	<aop:pointcut expression="execution(* exam.service..*.*(..))" id="transaction"/>
-	<aop:advisor advice-ref="txAdvice" pointcut-ref="transaction"/>
+    <aop:pointcut expression="execution(* exam.service..*.*(..))" id="transaction"/>
+    <aop:advisor advice-ref="txAdvice" pointcut-ref="transaction"/>
 </aop:config>
 ```
 
@@ -124,11 +124,11 @@ advice-ref是必须的属性，**并且这里的advice必须实现org.aopallianc
 <!-- 必须配置，因为被代理的对象必须在Spring容器中 -->
 <bean id="aopDemo" class="base.aop.AopDemo" />
 <aop:config>
-	<aop:pointcut id="pointcut" expression="execution(* base.aop.AopDemo.send())" />
-	<aop:aspect ref="aopAdvice">
-		<aop:before method="beforeSend" pointcut-ref="pointcut" />
-		<aop:after method="afterSend" pointcut-ref="pointcut" />
-	</aop:aspect>
+    <aop:pointcut id="pointcut" expression="execution(* base.aop.AopDemo.send())" />
+    <aop:aspect ref="aopAdvice">
+        <aop:before method="beforeSend" pointcut-ref="pointcut" />
+        <aop:after method="afterSend" pointcut-ref="pointcut" />
+    </aop:aspect>
 </aop:config>
 ```
 
@@ -136,34 +136,34 @@ advice-ref是必须的属性，**并且这里的advice必须实现org.aopallianc
 
 ```html
 AspectComponentDefinition
-	beanRefArray
-		RuntimeBeanReference(aop:aspect的ref属性)
-	beanDefArray
-		// 被注册
-		RootBeanDefinition(aop:declare-parents)
-			beanClass: DeclareParentsAdvisor
-			ConstructorArg
-				implement-interface
-				types-matching
-				default-impl
-				delegate-ref
-		// 被注册
-		RootBeanDefinition(aop:before,aop:after...)
-			beanClass: AspectJPointcutAdvisor
-			ConstructorArg
-				RootBeanDefinition
-					beanClass: 由子标签决定
-					ConstructorArg
-						RootBeanDefinition
-							beanClass: MethodLocatingFactoryBean
-							properties
-								targetBeanName: aspectName
-								methodName: method属性
-						RootBeanDefinition
-							beanClass: SimpleBeanFactoryAwareAspectInstanceFactory
-							properties
-								aspectBeanName: aspectName
-						//还有pointcut定义和引用...
+    beanRefArray
+        RuntimeBeanReference(aop:aspect的ref属性)
+    beanDefArray
+        // 被注册
+        RootBeanDefinition(aop:declare-parents)
+            beanClass: DeclareParentsAdvisor
+            ConstructorArg
+                implement-interface
+                types-matching
+                default-impl
+                delegate-ref
+        // 被注册
+        RootBeanDefinition(aop:before,aop:after...)
+            beanClass: AspectJPointcutAdvisor
+            ConstructorArg
+                RootBeanDefinition
+                    beanClass: 由子标签决定
+                    ConstructorArg
+                        RootBeanDefinition
+                            beanClass: MethodLocatingFactoryBean
+                            properties
+                                targetBeanName: aspectName
+                                methodName: method属性
+                        RootBeanDefinition
+                            beanClass: SimpleBeanFactoryAwareAspectInstanceFactory
+                            properties
+                                aspectBeanName: aspectName
+                        //还有pointcut定义和引用...
 ```
 
 结构图里面的aspectName来自于aop:aspect的ref属性，此属性是必须配置的，因为Spring要知道aop:before等标签指定的方法是哪个bean/类/对象的方法。
@@ -190,18 +190,18 @@ AspectComponentDefinition
 
 ```java
 private Class<?> getAdviceClass(Element adviceElement, ParserContext parserContext) {
-	String elementName = parserContext.getDelegate().getLocalName(adviceElement);
-	if (BEFORE.equals(elementName)) {
-		return AspectJMethodBeforeAdvice.class;
-	} else if (AFTER.equals(elementName)) {
-		return AspectJAfterAdvice.class;
-	} else if (AFTER_RETURNING_ELEMENT.equals(elementName)) {
-		return AspectJAfterReturningAdvice.class;
+    String elementName = parserContext.getDelegate().getLocalName(adviceElement);
+    if (BEFORE.equals(elementName)) {
+        return AspectJMethodBeforeAdvice.class;
+    } else if (AFTER.equals(elementName)) {
+        return AspectJAfterAdvice.class;
+    } else if (AFTER_RETURNING_ELEMENT.equals(elementName)) {
+        return AspectJAfterReturningAdvice.class;
     } else if (AFTER_THROWING_ELEMENT.equals(elementName)) {
-		return AspectJAfterThrowingAdvice.class;
-	} else if (AROUND.equals(elementName)) {
-		return AspectJAroundAdvice.class;
-	}
+        return AspectJAfterThrowingAdvice.class;
+    } else if (AROUND.equals(elementName)) {
+        return AspectJAroundAdvice.class;
+    }
 }
 ```
 
@@ -218,8 +218,8 @@ private Class<?> getAdviceClass(Element adviceElement, ParserContext parserConte
 ```java
 @Override
 public void setBeanFactory(BeanFactory beanFactory) {
-	Class<?> beanClass = beanFactory.getType(this.targetBeanName);
-	this.method = BeanUtils.resolveSignature(this.methodName, beanClass);
+    Class<?> beanClass = beanFactory.getType(this.targetBeanName);
+    this.method = BeanUtils.resolveSignature(this.methodName, beanClass);
 }
 ```
 
@@ -240,7 +240,7 @@ public void setBeanFactory(BeanFactory beanFactory) {
 ```java
 @Override
 public Object getAspectInstance() {
-	return this.beanFactory.getBean(this.aspectBeanName);
+    return this.beanFactory.getBean(this.aspectBeanName);
 }
 ```
 
@@ -272,7 +272,7 @@ AbstractAutowireCapableBeanFactory.createBean部分源码:
 //// Give BeanPostProcessors a chance to return a proxy instead of the target bean instance.
 Object bean = resolveBeforeInstantiation(beanName, mbdToUse);
 if (bean != null) {
-	return bean;
+    return bean;
 }
 Object beanInstance = doCreateBean(beanName, mbdToUse, args);
 ```
@@ -286,28 +286,28 @@ AbstractAutoProxyCreator.postProcessBeforeInstantiation:
 ```java
 @Override
 public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) {
-	Object cacheKey = getCacheKey(beanClass, beanName);
-	if (beanName == null || !this.targetSourcedBeans.contains(beanName)) {
-		if (this.advisedBeans.containsKey(cacheKey)) {
-			return null;
-		}
-		if (isInfrastructureClass(beanClass) || shouldSkip(beanClass, beanName)) {
-			this.advisedBeans.put(cacheKey, Boolean.FALSE);
-			return null;
-		}
-	}
-	if (beanName != null) {
-		TargetSource targetSource = getCustomTargetSource(beanClass, beanName);
-		if (targetSource != null) {
-			this.targetSourcedBeans.add(beanName);
-			Object[] specificInterceptors = 
-				getAdvicesAndAdvisorsForBean(beanClass, beanName, targetSource);
-			Object proxy = createProxy(beanClass, beanName, specificInterceptors, targetSource);
-			this.proxyTypes.put(cacheKey, proxy.getClass());
-			return proxy;
-		}
-	}
-	return null;
+    Object cacheKey = getCacheKey(beanClass, beanName);
+    if (beanName == null || !this.targetSourcedBeans.contains(beanName)) {
+        if (this.advisedBeans.containsKey(cacheKey)) {
+            return null;
+        }
+        if (isInfrastructureClass(beanClass) || shouldSkip(beanClass, beanName)) {
+            this.advisedBeans.put(cacheKey, Boolean.FALSE);
+            return null;
+        }
+    }
+    if (beanName != null) {
+        TargetSource targetSource = getCustomTargetSource(beanClass, beanName);
+        if (targetSource != null) {
+            this.targetSourcedBeans.add(beanName);
+            Object[] specificInterceptors = 
+                getAdvicesAndAdvisorsForBean(beanClass, beanName, targetSource);
+            Object proxy = createProxy(beanClass, beanName, specificInterceptors, targetSource);
+            this.proxyTypes.put(cacheKey, proxy.getClass());
+            return proxy;
+        }
+    }
+    return null;
 }
 ```
 
@@ -328,11 +328,11 @@ AbstractAutoProxyCreator.isInfrastructureClass:
 
 ```java
 protected boolean isInfrastructureClass(Class<?> beanClass) {
-	boolean retVal = Advice.class.isAssignableFrom(beanClass) ||
-			Pointcut.class.isAssignableFrom(beanClass) ||
-			Advisor.class.isAssignableFrom(beanClass) ||
-			AopInfrastructureBean.class.isAssignableFrom(beanClass);
-	return retVal;
+    boolean retVal = Advice.class.isAssignableFrom(beanClass) ||
+            Pointcut.class.isAssignableFrom(beanClass) ||
+            Advisor.class.isAssignableFrom(beanClass) ||
+            AopInfrastructureBean.class.isAssignableFrom(beanClass);
+    return retVal;
 }
 ```
 
@@ -345,15 +345,15 @@ protected boolean isInfrastructureClass(Class<?> beanClass) {
 ```java
 @Override
 protected boolean shouldSkip(Class<?> beanClass, String beanName) {
-	List<Advisor> candidateAdvisors = findCandidateAdvisors();
-	for (Advisor advisor : candidateAdvisors) {
-		if (advisor instanceof AspectJPointcutAdvisor) {
-			if (((AbstractAspectJAdvice) advisor.getAdvice()).getAspectName().equals(beanName)) {
-				return true;
-			}
-		}
-	}
-	return super.shouldSkip(beanClass, beanName);
+    List<Advisor> candidateAdvisors = findCandidateAdvisors();
+    for (Advisor advisor : candidateAdvisors) {
+        if (advisor instanceof AspectJPointcutAdvisor) {
+            if (((AbstractAspectJAdvice) advisor.getAdvice()).getAspectName().equals(beanName)) {
+                return true;
+            }
+        }
+    }
+    return super.shouldSkip(beanClass, beanName);
 }
 ```
 
@@ -364,8 +364,8 @@ protected boolean shouldSkip(Class<?> beanClass, String beanName) {
 ```xml
 <bean id="aopAdvice" class="base.aop.AopDemoAdvice" />
 <aop:config>
-	<aop:aspect ref="aopAdvice">
-	</aop:aspect>
+    <aop:aspect ref="aopAdvice">
+    </aop:aspect>
 </aop:config>
 ```
 
@@ -387,29 +387,29 @@ protected boolean shouldSkip(Class<?> beanClass, String beanName) {
 
 ```java
 public List<Advisor> findAdvisorBeans() {
-	String[] advisorNames = null;
-	synchronized (this) {
-      	 // 结果缓存
-		advisorNames = this.cachedAdvisorBeanNames;
-		if (advisorNames == null) {
-          	 // 去容器中寻找
-			advisorNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(
-					this.beanFactory, Advisor.class, true, false);
-			this.cachedAdvisorBeanNames = advisorNames;
-		}
-	}
-	if (advisorNames.length == 0) {
-		return new LinkedList<Advisor>();
-	}
-	List<Advisor> advisors = new LinkedList<Advisor>();
-	for (String name : advisorNames) {
-		if (isEligibleBean(name)) {
-			if (!this.beanFactory.isCurrentlyInCreation(name)) {
-				advisors.add(this.beanFactory.getBean(name, Advisor.class));
-			}
-		}
-	}
-	return advisors;
+    String[] advisorNames = null;
+    synchronized (this) {
+         // 结果缓存
+        advisorNames = this.cachedAdvisorBeanNames;
+        if (advisorNames == null) {
+             // 去容器中寻找
+            advisorNames = BeanFactoryUtils.beanNamesForTypeIncludingAncestors(
+                    this.beanFactory, Advisor.class, true, false);
+            this.cachedAdvisorBeanNames = advisorNames;
+        }
+    }
+    if (advisorNames.length == 0) {
+        return new LinkedList<Advisor>();
+    }
+    List<Advisor> advisors = new LinkedList<Advisor>();
+    for (String name : advisorNames) {
+        if (isEligibleBean(name)) {
+            if (!this.beanFactory.isCurrentlyInCreation(name)) {
+                advisors.add(this.beanFactory.getBean(name, Advisor.class));
+            }
+        }
+    }
+    return advisors;
 }
 ```
 
@@ -421,7 +421,7 @@ public List<Advisor> findAdvisorBeans() {
 
 ```java
 protected boolean isEligibleAdvisorBean(String beanName) {
-	return true;
+    return true;
 }
 ```
 
@@ -446,13 +446,13 @@ AbstractAutoProxyCreator.postProcessAfterInitialization:
 ```java
 @Override
 public Object postProcessAfterInitialization(Object bean, String beanName) {
-	if (bean != null) {
-		Object cacheKey = getCacheKey(bean.getClass(), beanName);
-		if (!this.earlyProxyReferences.contains(cacheKey)) {
-			return wrapIfNecessary(bean, beanName, cacheKey);
-		}
-	}
-	return bean;
+    if (bean != null) {
+        Object cacheKey = getCacheKey(bean.getClass(), beanName);
+        if (!this.earlyProxyReferences.contains(cacheKey)) {
+            return wrapIfNecessary(bean, beanName, cacheKey);
+        }
+    }
+    return bean;
 }
 ```
 
@@ -460,29 +460,29 @@ public Object postProcessAfterInitialization(Object bean, String beanName) {
 
 ```java
 protected Object wrapIfNecessary(Object bean, String beanName, Object cacheKey) {
-  	//自定义TargetSource，已经进行过代理子类生成
-	if (beanName != null && this.targetSourcedBeans.contains(beanName)) {
-		return bean;
-	}
-	if (Boolean.FALSE.equals(this.advisedBeans.get(cacheKey))) {
-		return bean;
-	}
-	if (isInfrastructureClass(bean.getClass()) || shouldSkip(bean.getClass(), beanName)) {
-		this.advisedBeans.put(cacheKey, Boolean.FALSE);
-		return bean;
-	}
-	// Create proxy if we have advice.
-	Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(bean.getClass(), beanName, null);
-	if (specificInterceptors != DO_NOT_PROXY) {
-		this.advisedBeans.put(cacheKey, Boolean.TRUE);
-      	// 创建
-		Object proxy = createProxy(
-				bean.getClass(), beanName, specificInterceptors, new SingletonTargetSource(bean));
-		this.proxyTypes.put(cacheKey, proxy.getClass());
-		return proxy;
-	}
-	this.advisedBeans.put(cacheKey, Boolean.FALSE);
-	return bean;
+    //自定义TargetSource，已经进行过代理子类生成
+    if (beanName != null && this.targetSourcedBeans.contains(beanName)) {
+        return bean;
+    }
+    if (Boolean.FALSE.equals(this.advisedBeans.get(cacheKey))) {
+        return bean;
+    }
+    if (isInfrastructureClass(bean.getClass()) || shouldSkip(bean.getClass(), beanName)) {
+        this.advisedBeans.put(cacheKey, Boolean.FALSE);
+        return bean;
+    }
+    // Create proxy if we have advice.
+    Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(bean.getClass(), beanName, null);
+    if (specificInterceptors != DO_NOT_PROXY) {
+        this.advisedBeans.put(cacheKey, Boolean.TRUE);
+        // 创建
+        Object proxy = createProxy(
+                bean.getClass(), beanName, specificInterceptors, new SingletonTargetSource(bean));
+        this.proxyTypes.put(cacheKey, proxy.getClass());
+        return proxy;
+    }
+    this.advisedBeans.put(cacheKey, Boolean.FALSE);
+    return bean;
 }
 ```
 
@@ -496,13 +496,13 @@ AbstractAdvisorAutoProxyCreator.findEligibleAdvisors:
 
 ```java
 protected List<Advisor> findEligibleAdvisors(Class<?> beanClass, String beanName) {
-	List<Advisor> candidateAdvisors = findCandidateAdvisors();
-	List<Advisor> eligibleAdvisors = findAdvisorsThatCanApply(candidateAdvisors, beanClass, beanName);
-	extendAdvisors(eligibleAdvisors);
-	if (!eligibleAdvisors.isEmpty()) {
-		eligibleAdvisors = sortAdvisors(eligibleAdvisors);
-	}
-	return eligibleAdvisors;
+    List<Advisor> candidateAdvisors = findCandidateAdvisors();
+    List<Advisor> eligibleAdvisors = findAdvisorsThatCanApply(candidateAdvisors, beanClass, beanName);
+    extendAdvisors(eligibleAdvisors);
+    if (!eligibleAdvisors.isEmpty()) {
+        eligibleAdvisors = sortAdvisors(eligibleAdvisors);
+    }
+    return eligibleAdvisors;
 }
 ```
 
@@ -514,26 +514,26 @@ findAdvisorsThatCanApply最终调用AopUtils.findAdvisorsThatCanApply:
 
 ```java
 public static List<Advisor> findAdvisorsThatCanApply(List<Advisor> candidateAdvisors, Class<?> clazz) {
-	if (candidateAdvisors.isEmpty()) {
-		return candidateAdvisors;
-	}
-	List<Advisor> eligibleAdvisors = new LinkedList<Advisor>();
-	for (Advisor candidate : candidateAdvisors) {
-		if (candidate instanceof IntroductionAdvisor && canApply(candidate, clazz)) {
-			eligibleAdvisors.add(candidate);
-		}
-	}
-	boolean hasIntroductions = !eligibleAdvisors.isEmpty();
-	for (Advisor candidate : candidateAdvisors) {
-		if (candidate instanceof IntroductionAdvisor) {
-			// already processed
-			continue;
-		}
-		if (canApply(candidate, clazz, hasIntroductions)) {
-			eligibleAdvisors.add(candidate);
-		}
-	}
-	return eligibleAdvisors;
+    if (candidateAdvisors.isEmpty()) {
+        return candidateAdvisors;
+    }
+    List<Advisor> eligibleAdvisors = new LinkedList<Advisor>();
+    for (Advisor candidate : candidateAdvisors) {
+        if (candidate instanceof IntroductionAdvisor && canApply(candidate, clazz)) {
+            eligibleAdvisors.add(candidate);
+        }
+    }
+    boolean hasIntroductions = !eligibleAdvisors.isEmpty();
+    for (Advisor candidate : candidateAdvisors) {
+        if (candidate instanceof IntroductionAdvisor) {
+            // already processed
+            continue;
+        }
+        if (canApply(candidate, clazz, hasIntroductions)) {
+            eligibleAdvisors.add(candidate);
+        }
+    }
+    return eligibleAdvisors;
 }
 ```
 
@@ -545,17 +545,17 @@ canApply(candidate, clazz)其实等价于canApply(candidate, clazz, false):
 
 ```java
 public static boolean canApply(Advisor advisor, Class<?> targetClass, boolean hasIntroductions) {
-	if (advisor instanceof IntroductionAdvisor) {
-		return ((IntroductionAdvisor) advisor).getClassFilter().matches(targetClass);
-	}
-	else if (advisor instanceof PointcutAdvisor) {
-		PointcutAdvisor pca = (PointcutAdvisor) advisor;
-		return canApply(pca.getPointcut(), targetClass, hasIntroductions);
-	}
-	else {
-		// It doesn't have a pointcut so we assume it applies.
-		return true;
-	}
+    if (advisor instanceof IntroductionAdvisor) {
+        return ((IntroductionAdvisor) advisor).getClassFilter().matches(targetClass);
+    }
+    else if (advisor instanceof PointcutAdvisor) {
+        PointcutAdvisor pca = (PointcutAdvisor) advisor;
+        return canApply(pca.getPointcut(), targetClass, hasIntroductions);
+    }
+    else {
+        // It doesn't have a pointcut so we assume it applies.
+        return true;
+    }
 }
 ```
 
@@ -571,35 +571,35 @@ AopUtils.canApply:
 
 ```java
 public static boolean canApply(Pointcut pc, Class<?> targetClass, boolean hasIntroductions) {
-	//是否Pointcut可以匹配当前类
-	if (!pc.getClassFilter().matches(targetClass)) {
-		return false;
-	}
-	MethodMatcher methodMatcher = pc.getMethodMatcher();
-  	//是否Pointcut可以匹配所有方法
-	if (methodMatcher == MethodMatcher.TRUE) {
-		// No need to iterate the methods if we're matching any method anyway...
-		return true;
-	}
-	IntroductionAwareMethodMatcher introductionAwareMethodMatcher = null;
-	if (methodMatcher instanceof IntroductionAwareMethodMatcher) {
-		introductionAwareMethodMatcher = (IntroductionAwareMethodMatcher) methodMatcher;
-	}
-	Set<Class<?>> classes = new LinkedHashSet<Class<?>>
-		(ClassUtils.getAllInterfacesForClassAsSet(targetClass));
-	classes.add(targetClass);
-	for (Class<?> clazz : classes) {
-		Method[] methods = ReflectionUtils.getAllDeclaredMethods(clazz);
-		for (Method method : methods) {
-			if ((introductionAwareMethodMatcher != null &&
-					introductionAwareMethodMatcher
-						.matches(method, targetClass, hasIntroductions)) ||
-					methodMatcher.matches(method, targetClass)) {
-				return true;
-			}
-		}
-	}
-	return false;
+    //是否Pointcut可以匹配当前类
+    if (!pc.getClassFilter().matches(targetClass)) {
+        return false;
+    }
+    MethodMatcher methodMatcher = pc.getMethodMatcher();
+    //是否Pointcut可以匹配所有方法
+    if (methodMatcher == MethodMatcher.TRUE) {
+        // No need to iterate the methods if we're matching any method anyway...
+        return true;
+    }
+    IntroductionAwareMethodMatcher introductionAwareMethodMatcher = null;
+    if (methodMatcher instanceof IntroductionAwareMethodMatcher) {
+        introductionAwareMethodMatcher = (IntroductionAwareMethodMatcher) methodMatcher;
+    }
+    Set<Class<?>> classes = new LinkedHashSet<Class<?>>
+        (ClassUtils.getAllInterfacesForClassAsSet(targetClass));
+    classes.add(targetClass);
+    for (Class<?> clazz : classes) {
+        Method[] methods = ReflectionUtils.getAllDeclaredMethods(clazz);
+        for (Method method : methods) {
+            if ((introductionAwareMethodMatcher != null &&
+                    introductionAwareMethodMatcher
+                        .matches(method, targetClass, hasIntroductions)) ||
+                    methodMatcher.matches(method, targetClass)) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 ```
 
@@ -625,15 +625,15 @@ AbstractAutoProxyCreator.createProxy(略去非关键代码):
 
 ```java
 protected Object createProxy(
-		Class<?> beanClass, String beanName, Object[] specificInterceptors, TargetSource targetSource) {
-	ProxyFactory proxyFactory = new ProxyFactory();
-	proxyFactory.copyFrom(this);
-  	//将interceptor适配为Advisor
-	Advisor[] advisors = buildAdvisors(beanName, specificInterceptors);
-	for (Advisor advisor : advisors) {
-		proxyFactory.addAdvisor(advisor);
-	}
-	return proxyFactory.getProxy(getProxyClassLoader());
+        Class<?> beanClass, String beanName, Object[] specificInterceptors, TargetSource targetSource) {
+    ProxyFactory proxyFactory = new ProxyFactory();
+    proxyFactory.copyFrom(this);
+    //将interceptor适配为Advisor
+    Advisor[] advisors = buildAdvisors(beanName, specificInterceptors);
+    for (Advisor advisor : advisors) {
+        proxyFactory.addAdvisor(advisor);
+    }
+    return proxyFactory.getProxy(getProxyClassLoader());
 }
 ```
 
@@ -644,16 +644,16 @@ protected Object createProxy(
 ```java
 @Override
 public AopProxy createAopProxy(AdvisedSupport config) throws AopConfigException {
-	if (config.isOptimize() || config.isProxyTargetClass() ||
-			hasNoUserSuppliedProxyInterfaces(config)) {
-		Class<?> targetClass = config.getTargetClass();
-		if (targetClass.isInterface() || Proxy.isProxyClass(targetClass)) {
-			return new JdkDynamicAopProxy(config);
-		}
-		return new ObjenesisCglibAopProxy(config);
-	} else {
-		return new JdkDynamicAopProxy(config);
-	}
+    if (config.isOptimize() || config.isProxyTargetClass() ||
+            hasNoUserSuppliedProxyInterfaces(config)) {
+        Class<?> targetClass = config.getTargetClass();
+        if (targetClass.isInterface() || Proxy.isProxyClass(targetClass)) {
+            return new JdkDynamicAopProxy(config);
+        }
+        return new ObjenesisCglibAopProxy(config);
+    } else {
+        return new JdkDynamicAopProxy(config);
+    }
 }
 ```
 
@@ -666,12 +666,12 @@ JdkDynamicAopProxy.getProxy:
 ```java
 @Override
 public Object getProxy(ClassLoader classLoader) {
-  	//找到可以用来进行代理的接口
-	Class<?>[] proxiedInterfaces = AopProxyUtils.completeProxiedInterfaces(this.advised, true);
-  	//用来代理的接口中是否定义了equals或者是hashCode方法?
-  	//结果保存在内部equalsDefined和hashCodeDefined两个成员变量中
-	findDefinedEqualsAndHashCodeMethods(proxiedInterfaces);
-	return Proxy.newProxyInstance(classLoader, proxiedInterfaces, this);
+    //找到可以用来进行代理的接口
+    Class<?>[] proxiedInterfaces = AopProxyUtils.completeProxiedInterfaces(this.advised, true);
+    //用来代理的接口中是否定义了equals或者是hashCode方法?
+    //结果保存在内部equalsDefined和hashCodeDefined两个成员变量中
+    findDefinedEqualsAndHashCodeMethods(proxiedInterfaces);
+    return Proxy.newProxyInstance(classLoader, proxiedInterfaces, this);
 }
 ```
 
@@ -687,8 +687,8 @@ invoke方法部分源码:
 
 ```java
 if (!this.equalsDefined && AopUtils.isEqualsMethod(method)) {
-	// The target does not implement the equals(Object) method itself.
-	return equals(args[0]);
+    // The target does not implement the equals(Object) method itself.
+    return equals(args[0]);
 }
 ```
 
@@ -743,11 +743,11 @@ DefaultBeanDefinitionDocumentReader.processBeanDefinition:
 
 ```java
 protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {
-	BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
-	if (bdHolder != null) {
-      	 // 装饰
-		bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
-	}
+    BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
+    if (bdHolder != null) {
+         // 装饰
+        bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
+    }
 }
 ```
 
@@ -755,17 +755,17 @@ BeanDefinitionParserDelegate.decorateIfRequired:
 
 ```java
 public BeanDefinitionHolder decorateIfRequired(
-		Node node, BeanDefinitionHolder originalDef, BeanDefinition containingBd) {
-	String namespaceUri = getNamespaceURI(node);
-	if (!isDefaultNamespace(namespaceUri)) {
-		NamespaceHandler handler = this.readerContext.getNamespaceHandlerResolver()
-			.resolve(namespaceUri);
-		if (handler != null) {
-			return handler.
-				decorate(node, originalDef, new ParserContext(this.readerContext, this, containingBd));
-		}
-	}
-	return originalDef;
+        Node node, BeanDefinitionHolder originalDef, BeanDefinition containingBd) {
+    String namespaceUri = getNamespaceURI(node);
+    if (!isDefaultNamespace(namespaceUri)) {
+        NamespaceHandler handler = this.readerContext.getNamespaceHandlerResolver()
+            .resolve(namespaceUri);
+        if (handler != null) {
+            return handler.
+                decorate(node, originalDef, new ParserContext(this.readerContext, this, containingBd));
+        }
+    }
+    return originalDef;
 }
 ```
 
@@ -778,21 +778,21 @@ public BeanDefinitionHolder decorateIfRequired(
 ```java
 @Override
 public BeanDefinitionHolder decorate(Node node, BeanDefinitionHolder definition, ParserContext parserContext) {
-	boolean proxyTargetClass = true;
-	if (node instanceof Element) {
-		Element ele = (Element) node;
-		if (ele.hasAttribute(PROXY_TARGET_CLASS)) {
-			proxyTargetClass = Boolean.valueOf(ele.getAttribute(PROXY_TARGET_CLASS));
-		}
-	}
-	BeanDefinitionHolder holder =
-			ScopedProxyUtils.
-			createScopedProxy(definition, parserContext.getRegistry(), proxyTargetClass);
-	String targetBeanName = ScopedProxyUtils.getTargetBeanName(definition.getBeanName());
-  	// 空实现
-	parserContext.getReaderContext().fireComponentRegistered(
-			new BeanComponentDefinition(definition.getBeanDefinition(), targetBeanName));
-	return holder;
+    boolean proxyTargetClass = true;
+    if (node instanceof Element) {
+        Element ele = (Element) node;
+        if (ele.hasAttribute(PROXY_TARGET_CLASS)) {
+            proxyTargetClass = Boolean.valueOf(ele.getAttribute(PROXY_TARGET_CLASS));
+        }
+    }
+    BeanDefinitionHolder holder =
+            ScopedProxyUtils.
+            createScopedProxy(definition, parserContext.getRegistry(), proxyTargetClass);
+    String targetBeanName = ScopedProxyUtils.getTargetBeanName(definition.getBeanName());
+    // 空实现
+    parserContext.getReaderContext().fireComponentRegistered(
+            new BeanComponentDefinition(definition.getBeanDefinition(), targetBeanName));
+    return holder;
 }
 ```
 
@@ -809,26 +809,26 @@ public BeanDefinitionHolder decorate(Node node, BeanDefinitionHolder definition,
 ```java
 @Override
 public void setBeanFactory(BeanFactory beanFactory) {
-	ConfigurableBeanFactory cbf = (ConfigurableBeanFactory) beanFactory;
-	this.scopedTargetSource.setBeanFactory(beanFactory);
-	ProxyFactory pf = new ProxyFactory();
-	pf.copyFrom(this);
-	pf.setTargetSource(this.scopedTargetSource);
+    ConfigurableBeanFactory cbf = (ConfigurableBeanFactory) beanFactory;
+    this.scopedTargetSource.setBeanFactory(beanFactory);
+    ProxyFactory pf = new ProxyFactory();
+    pf.copyFrom(this);
+    pf.setTargetSource(this.scopedTargetSource);
 
-	Class<?> beanType = beanFactory.getType(this.targetBeanName);
-	if (!isProxyTargetClass() || beanType.isInterface() || 
-		Modifier.isPrivate(beanType.getModifiers())) {
-      	 // JDK动态代理可用的接口
-		pf.setInterfaces(ClassUtils.getAllInterfacesForClass(beanType, cbf.getBeanClassLoader()));
-	}
-	// Add an introduction that implements only the methods on ScopedObject.
-	ScopedObject scopedObject = new DefaultScopedObject
-		(cbf, this.scopedTargetSource.getTargetBeanName());
-	pf.addAdvice(new DelegatingIntroductionInterceptor(scopedObject));
-	// Add the AopInfrastructureBean marker to indicate that the scoped proxy
-	// itself is not subject to auto-proxying! Only its target bean is.
-	pf.addInterface(AopInfrastructureBean.class);
-	this.proxy = pf.getProxy(cbf.getBeanClassLoader());
+    Class<?> beanType = beanFactory.getType(this.targetBeanName);
+    if (!isProxyTargetClass() || beanType.isInterface() || 
+        Modifier.isPrivate(beanType.getModifiers())) {
+         // JDK动态代理可用的接口
+        pf.setInterfaces(ClassUtils.getAllInterfacesForClass(beanType, cbf.getBeanClassLoader()));
+    }
+    // Add an introduction that implements only the methods on ScopedObject.
+    ScopedObject scopedObject = new DefaultScopedObject
+        (cbf, this.scopedTargetSource.getTargetBeanName());
+    pf.addAdvice(new DelegatingIntroductionInterceptor(scopedObject));
+    // Add the AopInfrastructureBean marker to indicate that the scoped proxy
+    // itself is not subject to auto-proxying! Only its target bean is.
+    pf.addInterface(AopInfrastructureBean.class);
+    this.proxy = pf.getProxy(cbf.getBeanClassLoader());
 }
 ```
 
@@ -845,15 +845,15 @@ AdvisedSupport.addAdvice方法将其转化为Advisor:
 ```java
 @Override
 public void addAdvice(int pos, Advice advice) throws AopConfigException {
-	if (advice instanceof IntroductionInfo) {
-		// We don't need an IntroductionAdvisor for this kind of introduction:
-		// It's fully self-describing.
-		addAdvisor(pos, new DefaultIntroductionAdvisor(advice, (IntroductionInfo) advice));
-	} else if (advice instanceof DynamicIntroductionAdvice) {
-		// We need an IntroductionAdvisor for this kind of introduction.
+    if (advice instanceof IntroductionInfo) {
+        // We don't need an IntroductionAdvisor for this kind of introduction:
+        // It's fully self-describing.
+        addAdvisor(pos, new DefaultIntroductionAdvisor(advice, (IntroductionInfo) advice));
+    } else if (advice instanceof DynamicIntroductionAdvice) {
+        // We need an IntroductionAdvisor for this kind of introduction.
     } else {
-		addAdvisor(pos, new DefaultPointcutAdvisor(advice));
-	}
+        addAdvisor(pos, new DefaultPointcutAdvisor(advice));
+    }
 }
 ```
 
@@ -883,7 +883,7 @@ public class OneScope implements Scope {
         System.out.println("get被调用");
         return new Student("skywalker-" + (index++), index);
     }
-	//忽略其它方法
+    //忽略其它方法
 }
 ```
 
@@ -899,13 +899,13 @@ public class OneScope implements Scope {
 
   ```xml
   <bean class="org.springframework.beans.factory.config.CustomScopeConfigurer">
-  	<property name="scopes">
-  		<map>
-  			<entry key="one">
-  				<bean class="base.scope.OneScope" />
-  			</entry>
-  		</map>
-  	</property>
+    <property name="scopes">
+        <map>
+            <entry key="one">
+                <bean class="base.scope.OneScope" />
+            </entry>
+        </map>
+    </property>
   </bean>
   ```
 
@@ -915,11 +915,11 @@ public class OneScope implements Scope {
 
 ```xml
 <bean class="base.SimpleBean" id="simpleBean">
-	<property name="student" ref="student" />
+    <property name="student" ref="student" />
 </bean>
 
 <bean id="student" class="base.Student" scope="one">
-	<aop:scoped-proxy />
+    <aop:scoped-proxy />
 </bean>
 ```
 
@@ -953,21 +953,21 @@ skywalker-1
 ```java
 //scope非prototype和Singleton
 else {
-	String scopeName = mbd.getScope();
-	final Scope scope = this.scopes.get(scopeName);
-	Object scopedInstance = scope.get(beanName, new ObjectFactory<Object>() {
-		@Override
-		public Object getObject() throws BeansException {
-			beforePrototypeCreation(beanName);
-			try {
-				return createBean(beanName, mbd, args);
-			}
-			finally {
-				afterPrototypeCreation(beanName);
-			}
-		}
-	});
-	bean = getObjectForBeanInstance(scopedInstance, name, beanName, mbd);
+    String scopeName = mbd.getScope();
+    final Scope scope = this.scopes.get(scopeName);
+    Object scopedInstance = scope.get(beanName, new ObjectFactory<Object>() {
+        @Override
+        public Object getObject() throws BeansException {
+            beforePrototypeCreation(beanName);
+            try {
+                return createBean(beanName, mbd, args);
+            }
+            finally {
+                afterPrototypeCreation(beanName);
+            }
+        }
+    });
+    bean = getObjectForBeanInstance(scopedInstance, name, beanName, mbd);
 }
 ```
 
@@ -1012,7 +1012,7 @@ Cglib的Enhancer可以指定一个Callback数组，而accept方法的返回值�
 ```java
 @Override
 public Object intercept(Object proxy, Method method, Object[] args, MethodProxy methodProxy) {
-	Object target = getTarget();
+    Object target = getTarget();
 }
 ```
 
@@ -1022,7 +1022,7 @@ getTarget:
 
 ```java
 protected Object getTarget() throws Exception {
-	return this.advised.getTargetSource().getTarget();
+    return this.advised.getTargetSource().getTarget();
 }
 ```
 
@@ -1031,7 +1031,7 @@ TargetSource前面说过了，默认是SimpleBeanTargetSource:
 ```java
 @Override
 public Object getTarget() throws Exception {
-	return getBeanFactory().getBean(getTargetBeanName());
+    return getBeanFactory().getBean(getTargetBeanName());
 }
 ```
 
@@ -1103,10 +1103,10 @@ AspectJAutoProxyBeanDefinitionParser.parse:
 ```java
 @Override
 public BeanDefinition parse(Element element, ParserContext parserContext) {
-	AopNamespaceUtils.
-		registerAspectJAnnotationAutoProxyCreatorIfNecessary(parserContext, element);
-	extendBeanDefinition(element, parserContext);
-	return null;
+    AopNamespaceUtils.
+        registerAspectJAnnotationAutoProxyCreatorIfNecessary(parserContext, element);
+    extendBeanDefinition(element, parserContext);
+    return null;
 }
 ```
 
@@ -1123,10 +1123,10 @@ AnnotationAwareAspectJAutoProxyCreator.findCandidateAdvisors:
 ```java
 @Override
 protected List<Advisor> findCandidateAdvisors() {
-	List<Advisor> advisors = super.findCandidateAdvisors();
-  	//这里
-	advisors.addAll(this.aspectJAdvisorsBuilder.buildAspectJAdvisors());
-	return advisors;
+    List<Advisor> advisors = super.findCandidateAdvisors();
+    //这里
+    advisors.addAll(this.aspectJAdvisorsBuilder.buildAspectJAdvisors());
+    return advisors;
 }
 ```
 
@@ -1137,7 +1137,7 @@ AbstractAspectJAdvisorFactory.isAspect:
 ```java
 @Override
 public boolean isAspect(Class<?> clazz) {
-	return (hasAspectAnnotation(clazz) && !compiledByAjc(clazz));
+    return (hasAspectAnnotation(clazz) && !compiledByAjc(clazz));
 }
 ```
 

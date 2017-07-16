@@ -17,7 +17,7 @@ task:annotation-driven标签被以上两种功能共有。下面就这两种功�
 <task:scheduler id="scheduler" pool-size="3" />
 <bean id="task" class="task.Task"/>
 <task:scheduled-tasks scheduler="scheduler">
-	<task:scheduled ref="task" method="print" cron="0/5 * * * * ?"/>
+    <task:scheduled ref="task" method="print" cron="0/5 * * * * ?"/>
 </task:scheduled-tasks>
 ```
 
@@ -44,10 +44,10 @@ public class Task {
 ```java
 @Override
 public void init() {
-	this.registerBeanDefinitionParser("annotation-driven", new AnnotationDrivenBeanDefinitionParser());
-	this.registerBeanDefinitionParser("executor", new ExecutorBeanDefinitionParser());
-	this.registerBeanDefinitionParser("scheduled-tasks", new ScheduledTasksBeanDefinitionParser());
-	this.registerBeanDefinitionParser("scheduler", new SchedulerBeanDefinitionParser());
+    this.registerBeanDefinitionParser("annotation-driven", new AnnotationDrivenBeanDefinitionParser());
+    this.registerBeanDefinitionParser("executor", new ExecutorBeanDefinitionParser());
+    this.registerBeanDefinitionParser("scheduled-tasks", new ScheduledTasksBeanDefinitionParser());
+    this.registerBeanDefinitionParser("scheduler", new SchedulerBeanDefinitionParser());
 }
 ```
 
@@ -58,15 +58,15 @@ SchedulerBeanDefinitionParser源码:
 ```java
 @Override
 protected String getBeanClassName(Element element) {
-	return "org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler";
+    return "org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler";
 }
 
 @Override
 protected void doParse(Element element, BeanDefinitionBuilder builder) {
-	String poolSize = element.getAttribute("pool-size");
-	if (StringUtils.hasText(poolSize)) {
-		builder.addPropertyValue("poolSize", poolSize);
-	}
+    String poolSize = element.getAttribute("pool-size");
+    if (StringUtils.hasText(poolSize)) {
+        builder.addPropertyValue("poolSize", poolSize);
+    }
 }
 ```
 
@@ -103,7 +103,7 @@ ContextLifecycleScheduledTaskRegistrar只实现了afterSingletonsInstantiated方
 ```java
 @Override
 public void afterSingletonsInstantiated() {
-	scheduleTasks();
+    scheduleTasks();
 }
 ```
 
@@ -111,31 +111,31 @@ ScheduledTaskRegistrar.scheduleTasks:
 
 ```java
 protected void scheduleTasks() {
-  	 // shcheduler初始化
-	if (this.taskScheduler == null) {
-		this.localExecutor = Executors.newSingleThreadScheduledExecutor();
-		this.taskScheduler = new ConcurrentTaskScheduler(this.localExecutor);
-	}
-	if (this.triggerTasks != null) {
-		for (TriggerTask task : this.triggerTasks) {
-			addScheduledTask(scheduleTriggerTask(task));
-		}
-	}
-	if (this.cronTasks != null) {
-		for (CronTask task : this.cronTasks) {
-			addScheduledTask(scheduleCronTask(task));
-		}
-	}
-	if (this.fixedRateTasks != null) {
-		for (IntervalTask task : this.fixedRateTasks) {
-			addScheduledTask(scheduleFixedRateTask(task));
-		}
-	}
-	if (this.fixedDelayTasks != null) {
-		for (IntervalTask task : this.fixedDelayTasks) {
-			addScheduledTask(scheduleFixedDelayTask(task));
-		}
-	}
+     // shcheduler初始化
+    if (this.taskScheduler == null) {
+        this.localExecutor = Executors.newSingleThreadScheduledExecutor();
+        this.taskScheduler = new ConcurrentTaskScheduler(this.localExecutor);
+    }
+    if (this.triggerTasks != null) {
+        for (TriggerTask task : this.triggerTasks) {
+            addScheduledTask(scheduleTriggerTask(task));
+        }
+    }
+    if (this.cronTasks != null) {
+        for (CronTask task : this.cronTasks) {
+            addScheduledTask(scheduleCronTask(task));
+        }
+    }
+    if (this.fixedRateTasks != null) {
+        for (IntervalTask task : this.fixedRateTasks) {
+            addScheduledTask(scheduleFixedRateTask(task));
+        }
+    }
+    if (this.fixedDelayTasks != null) {
+        for (IntervalTask task : this.fixedDelayTasks) {
+            addScheduledTask(scheduleFixedDelayTask(task));
+        }
+    }
 }
 ```
 
@@ -157,11 +157,11 @@ ConcurrentTaskExecutor来自另一个继承体系: TaskExecutor，这和spring-t
 
 ```java
 public ScheduledTask scheduleCronTask(CronTask task) {
-	ScheduledTask scheduledTask = this.unresolvedTasks.remove(task);
-	if (this.taskScheduler != null) {
-		scheduledTask.future = this.taskScheduler.schedule(task.getRunnable(), task.getTrigger());
-	}
-	return (newTask ? scheduledTask : null);
+    ScheduledTask scheduledTask = this.unresolvedTasks.remove(task);
+    if (this.taskScheduler != null) {
+        scheduledTask.future = this.taskScheduler.schedule(task.getRunnable(), task.getTrigger());
+    }
+    return (newTask ? scheduledTask : null);
 }
 ```
 
@@ -179,7 +179,7 @@ CronTask构造器:
 
 ```java
 public CronTask(Runnable runnable, String expression) {
-	this(runnable, new CronTrigger(expression));
+    this(runnable, new CronTrigger(expression));
 }
 ```
 
@@ -187,7 +187,7 @@ CronTrigger构造器:
 
 ```java
 public CronTrigger(String expression) {
-	this.sequenceGenerator = new CronSequenceGenerator(expression);
+    this.sequenceGenerator = new CronSequenceGenerator(expression);
 }
 ```
 
@@ -195,13 +195,13 @@ public CronTrigger(String expression) {
 
 ```java
 public CronSequenceGenerator(String expression) {
-	this(expression, TimeZone.getDefault());
+    this(expression, TimeZone.getDefault());
 }
 
 public CronSequenceGenerator(String expression, TimeZone timeZone) {
-	this.expression = expression;
-	this.timeZone = timeZone;
-	parse(expression);
+    this.expression = expression;
+    this.timeZone = timeZone;
+    parse(expression);
 }
 ```
 
@@ -212,8 +212,8 @@ ConcurrentTaskScheduler.schedule:
 ```java
 @Override
 public ScheduledFuture<?> schedule(Runnable task, Trigger trigger) {
-	ErrorHandler errorHandler = (this.errorHandler != null ? this.errorHandler : 			 				TaskUtils.getDefaultErrorHandler(true));
-	return new ReschedulingRunnable(task, trigger, this.scheduledExecutor, errorHandler).schedule();
+    ErrorHandler errorHandler = (this.errorHandler != null ? this.errorHandler : 			 				TaskUtils.getDefaultErrorHandler(true));
+    return new ReschedulingRunnable(task, trigger, this.scheduledExecutor, errorHandler).schedule();
 }
 ```
 
@@ -227,15 +227,15 @@ schedule方法:
 
 ```java
 public ScheduledFuture<?> schedule() {
-	synchronized (this.triggerContextMonitor) {
-		this.scheduledExecutionTime = this.trigger.nextExecutionTime(this.triggerContext);
-		if (this.scheduledExecutionTime == null) {
-			return null;
-		}
-		long initialDelay = this.scheduledExecutionTime.getTime() - System.currentTimeMillis();
-		this.currentFuture = this.executor.schedule(this, initialDelay, TimeUnit.MILLISECONDS);
-		return this;
-	}
+    synchronized (this.triggerContextMonitor) {
+        this.scheduledExecutionTime = this.trigger.nextExecutionTime(this.triggerContext);
+        if (this.scheduledExecutionTime == null) {
+            return null;
+        }
+        long initialDelay = this.scheduledExecutionTime.getTime() - System.currentTimeMillis();
+        this.currentFuture = this.executor.schedule(this, initialDelay, TimeUnit.MILLISECONDS);
+        return this;
+    }
 }
 ```
 
@@ -244,16 +244,16 @@ public ScheduledFuture<?> schedule() {
 ```java
 @Override
 public void run() {
-	Date actualExecutionTime = new Date();
-	super.run();
-	Date completionTime = new Date();
-	synchronized (this.triggerContextMonitor) {
-		this.triggerContext.update(this.scheduledExecutionTime, actualExecutionTime, completionTime);
-		if (!this.currentFuture.isCancelled()) {
-          	 //下次调用
-			schedule();
-		}
-	}
+    Date actualExecutionTime = new Date();
+    super.run();
+    Date completionTime = new Date();
+    synchronized (this.triggerContextMonitor) {
+        this.triggerContext.update(this.scheduledExecutionTime, actualExecutionTime, completionTime);
+        if (!this.currentFuture.isCancelled()) {
+             //下次调用
+            schedule();
+        }
+    }
 }
 ```
 
@@ -271,8 +271,8 @@ delegate便是前面提到过的ScheduledMethodRunnable，其run方法:
 ```java
 @Override
 public void run() {
-	ReflectionUtils.makeAccessible(this.method);
-  	this.method.invoke(this.target);
+    ReflectionUtils.makeAccessible(this.method);
+    this.method.invoke(this.target);
 }
 ```
 
@@ -280,18 +280,18 @@ public void run() {
 
 ```java
 public ScheduledTask scheduleFixedDelayTask(IntervalTask task) {
-	if (this.taskScheduler != null) {
-		if (task.getInitialDelay() > 0) {
-			Date startTime = new Date(System.currentTimeMillis() + task.getInitialDelay());
-			scheduledTask.future =
-			this.taskScheduler.scheduleWithFixedDelay(task.getRunnable(),
+    if (this.taskScheduler != null) {
+        if (task.getInitialDelay() > 0) {
+            Date startTime = new Date(System.currentTimeMillis() + task.getInitialDelay());
+            scheduledTask.future =
+            this.taskScheduler.scheduleWithFixedDelay(task.getRunnable(),
                                                       startTime, task.getInterval());
-		} else {
-			scheduledTask.future =
-					this.taskScheduler.scheduleWithFixedDelay(task.getRunnable(), task.getInterval());
-		}
-	}
-	return (newTask ? scheduledTask : null);
+        } else {
+            scheduledTask.future =
+                    this.taskScheduler.scheduleWithFixedDelay(task.getRunnable(), task.getInterval());
+        }
+    }
+    return (newTask ? scheduledTask : null);
 }
 ```
 
@@ -315,7 +315,7 @@ public ScheduledTask scheduleFixedDelayTask(IntervalTask task) {
 ```java
 @Async("executor")
 public void print() {
-	System.out.println("print执行");
+    System.out.println("print执行");
 }
 ```
 

@@ -5,13 +5,13 @@
 ```xml
 <!-- 数据源以Sping自带为例，每次请求均返回一个新的连接 -->
 <bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
-	<property name="driverClassName" value="${jdbc.driverClassName}" />
-	<property name="url" value="${jdbc.url}" />
+    <property name="driverClassName" value="${jdbc.driverClassName}" />
+    <property name="url" value="${jdbc.url}" />
     <property name="username" value="${jdbc.username}" />
     <property name="password" value="${jdbc.password}" />
 </bean>
 <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
-	<property name="dataSource" ref="dataSource"/>
+    <property name="dataSource" ref="dataSource"/>
 </bean>
 <tx:annotation-driven transaction-manager="transactionManager"/>
 ```
@@ -23,10 +23,10 @@ TxNamespaceHandler.init:
 ```java
 @Override
 public void init() {
-	registerBeanDefinitionParser("advice", new TxAdviceBeanDefinitionParser());
-	registerBeanDefinitionParser("annotation-driven", 
+    registerBeanDefinitionParser("advice", new TxAdviceBeanDefinitionParser());
+    registerBeanDefinitionParser("annotation-driven", 
         new AnnotationDrivenBeanDefinitionParser());
-	registerBeanDefinitionParser("jta-transaction-manager", new JtaTransactionManagerBeanDefinitionParser());
+    registerBeanDefinitionParser("jta-transaction-manager", new JtaTransactionManagerBeanDefinitionParser());
 }
 ```
 
@@ -35,16 +35,16 @@ public void init() {
 ```java
 @Override
 public BeanDefinition parse(Element element, ParserContext parserContext) {
-	registerTransactionalEventListenerFactory(parserContext);
-	String mode = element.getAttribute("mode");
-	if ("aspectj".equals(mode)) {
-		// mode="aspectj"
-		registerTransactionAspect(element, parserContext);
-	} else {
-		// mode="proxy"
-		AopAutoProxyConfigurer.configureAutoProxyCreator(element, parserContext);
-	}
-	return null;
+    registerTransactionalEventListenerFactory(parserContext);
+    String mode = element.getAttribute("mode");
+    if ("aspectj".equals(mode)) {
+        // mode="aspectj"
+        registerTransactionAspect(element, parserContext);
+    } else {
+        // mode="proxy"
+        AopAutoProxyConfigurer.configureAutoProxyCreator(element, parserContext);
+    }
+    return null;
 }
 ```
 
@@ -75,13 +75,13 @@ BeanFactoryTransactionAttributeSourceAdvisor->TransactionInterceptor->Annotation
 ```java
 @Override
 public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
-	if (bean != null) {
-		Object cacheKey = getCacheKey(bean.getClass(), beanName);
-		if (!this.earlyProxyReferences.contains(cacheKey)) {
-			return wrapIfNecessary(bean, beanName, cacheKey);
-		}
-	}
-	return bean;
+    if (bean != null) {
+        Object cacheKey = getCacheKey(bean.getClass(), beanName);
+        if (!this.earlyProxyReferences.contains(cacheKey)) {
+            return wrapIfNecessary(bean, beanName, cacheKey);
+        }
+    }
+    return bean;
 }
 ```
 
@@ -89,15 +89,15 @@ wrapIfNecessary核心逻辑:
 
 ```java
 protected Object wrapIfNecessary(Object bean, String beanName, Object cacheKey) {
-	// Create proxy if we have advice.
-	Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(bean.getClass(), beanName, null);
-	if (specificInterceptors != DO_NOT_PROXY) {
-		this.advisedBeans.put(cacheKey, Boolean.TRUE);
-		Object proxy = createProxy(
-			bean.getClass(), beanName, specificInterceptors, new SingletonTargetSource(bean));
-		this.proxyTypes.put(cacheKey, proxy.getClass());
-		return proxy;
-	}
+    // Create proxy if we have advice.
+    Object[] specificInterceptors = getAdvicesAndAdvisorsForBean(bean.getClass(), beanName, null);
+    if (specificInterceptors != DO_NOT_PROXY) {
+        this.advisedBeans.put(cacheKey, Boolean.TRUE);
+        Object proxy = createProxy(
+            bean.getClass(), beanName, specificInterceptors, new SingletonTargetSource(bean));
+        this.proxyTypes.put(cacheKey, proxy.getClass());
+        return proxy;
+    }
 }
 ```
 
@@ -107,14 +107,14 @@ getAdvicesAndAdvisorsForBean用于去容器中寻找适合当前bean的Advisor�
 
 ```java
 protected List<Advisor> findEligibleAdvisors(Class<?> beanClass, String beanName) {
-	List<Advisor> candidateAdvisors = findCandidateAdvisors();
-	List<Advisor> eligibleAdvisors = findAdvisorsThatCanApply(candidateAdvisors, beanClass, beanName);
-	extendAdvisors(eligibleAdvisors);
-	if (!eligibleAdvisors.isEmpty()) {
-      	//按照@Ordered排序
-		eligibleAdvisors = sortAdvisors(eligibleAdvisors);
-	}
-	return eligibleAdvisors;
+    List<Advisor> candidateAdvisors = findCandidateAdvisors();
+    List<Advisor> eligibleAdvisors = findAdvisorsThatCanApply(candidateAdvisors, beanClass, beanName);
+    extendAdvisors(eligibleAdvisors);
+    if (!eligibleAdvisors.isEmpty()) {
+        //按照@Ordered排序
+        eligibleAdvisors = sortAdvisors(eligibleAdvisors);
+    }
+    return eligibleAdvisors;
 }
 ```
 
@@ -153,12 +153,12 @@ TransactionAttributeSourcePointcut.matches:
 ```java
 @Override
 public boolean matches(Method method, Class<?> targetClass) {
-  	//如果已经是事务代理，那么不应该再次代理
-	if (TransactionalProxy.class.isAssignableFrom(targetClass)) {
-		return false;
-	}
-	TransactionAttributeSource tas = getTransactionAttributeSource();
-	return (tas == null || tas.getTransactionAttribute(method, targetClass) != null);
+    //如果已经是事务代理，那么不应该再次代理
+    if (TransactionalProxy.class.isAssignableFrom(targetClass)) {
+        return false;
+    }
+    TransactionAttributeSource tas = getTransactionAttributeSource();
+    return (tas == null || tas.getTransactionAttribute(method, targetClass) != null);
 }
 ```
 
@@ -166,40 +166,40 @@ getTransactionAttribute方法使用了缓存的思想，但其核心逻辑位于
 
 ```java
 protected TransactionAttribute computeTransactionAttribute(Method method, Class<?> targetClass) {
-	// Don't allow no-public methods as required.
-	if (allowPublicMethodsOnly() && !Modifier.isPublic(method.getModifiers())) {
-		return null;
-	}
-	// Ignore CGLIB subclasses - introspect the actual user class.
-	Class<?> userClass = ClassUtils.getUserClass(targetClass);
-	// The method may be on an interface, but we need attributes from the target class.
-	// If the target class is null, the method will be unchanged.
-	Method specificMethod = ClassUtils.getMostSpecificMethod(method, userClass);
-	// If we are dealing with method with generic parameters, find the original method.
-	specificMethod = BridgeMethodResolver.findBridgedMethod(specificMethod);
-	// First try is the method in the target class.
-	TransactionAttribute txAtt = findTransactionAttribute(specificMethod);
-	if (txAtt != null) {
-		return txAtt;
-	}
-	// Second try is the transaction attribute on the target class.
-	txAtt = findTransactionAttribute(specificMethod.getDeclaringClass());
-	if (txAtt != null && ClassUtils.isUserLevelMethod(method)) {
-		return txAtt;
-	}
-	if (specificMethod != method) {
-		// Fallback is to look at the original method.
-		txAtt = findTransactionAttribute(method);
-		if (txAtt != null) {
-			return txAtt;
-		}
-		// Last fallback is the class of the original method.
-		txAtt = findTransactionAttribute(method.getDeclaringClass());
-		if (txAtt != null && ClassUtils.isUserLevelMethod(method)) {
-			return txAtt;
-		}
-	}
-	return null;
+    // Don't allow no-public methods as required.
+    if (allowPublicMethodsOnly() && !Modifier.isPublic(method.getModifiers())) {
+        return null;
+    }
+    // Ignore CGLIB subclasses - introspect the actual user class.
+    Class<?> userClass = ClassUtils.getUserClass(targetClass);
+    // The method may be on an interface, but we need attributes from the target class.
+    // If the target class is null, the method will be unchanged.
+    Method specificMethod = ClassUtils.getMostSpecificMethod(method, userClass);
+    // If we are dealing with method with generic parameters, find the original method.
+    specificMethod = BridgeMethodResolver.findBridgedMethod(specificMethod);
+    // First try is the method in the target class.
+    TransactionAttribute txAtt = findTransactionAttribute(specificMethod);
+    if (txAtt != null) {
+        return txAtt;
+    }
+    // Second try is the transaction attribute on the target class.
+    txAtt = findTransactionAttribute(specificMethod.getDeclaringClass());
+    if (txAtt != null && ClassUtils.isUserLevelMethod(method)) {
+        return txAtt;
+    }
+    if (specificMethod != method) {
+        // Fallback is to look at the original method.
+        txAtt = findTransactionAttribute(method);
+        if (txAtt != null) {
+            return txAtt;
+        }
+        // Last fallback is the class of the original method.
+        txAtt = findTransactionAttribute(method.getDeclaringClass());
+        if (txAtt != null && ClassUtils.isUserLevelMethod(method)) {
+            return txAtt;
+        }
+    }
+    return null;
 }
 ```
 
@@ -212,17 +212,17 @@ protected TransactionAttribute computeTransactionAttribute(Method method, Class<
 ```java
 @Override
 public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-	List<Object> chain = this.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
-	if (chain.isEmpty()) {.
-      	//没有可用的拦截器，直接调用原方法
-		Object[] argsToUse = AopProxyUtils.adaptArgumentsIfNecessary(method, args);
-		retVal = AopUtils.invokeJoinpointUsingReflection(target, method, argsToUse);
-	} else {
-		// We need to create a method invocation...
-		invocation = new ReflectiveMethodInvocation(proxy, target, method, args, targetClass, chain);
-		// Proceed to the joinpoint through the interceptor chain.
-		Object retVal = invocation.proceed();
-	}
+    List<Object> chain = this.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
+    if (chain.isEmpty()) {.
+        //没有可用的拦截器，直接调用原方法
+        Object[] argsToUse = AopProxyUtils.adaptArgumentsIfNecessary(method, args);
+        retVal = AopUtils.invokeJoinpointUsingReflection(target, method, argsToUse);
+    } else {
+        // We need to create a method invocation...
+        invocation = new ReflectiveMethodInvocation(proxy, target, method, args, targetClass, chain);
+        // Proceed to the joinpoint through the interceptor chain.
+        Object retVal = invocation.proceed();
+    }
 }
 ```
 
@@ -237,20 +237,20 @@ public Object invoke(Object proxy, Method method, Object[] args) throws Throwabl
 ```java
 @Override
 public MethodInterceptor[] getInterceptors(Advisor advisor) throws UnknownAdviceTypeException {
-	List<MethodInterceptor> interceptors = new ArrayList<MethodInterceptor>(3);
-	Advice advice = advisor.getAdvice();
-	if (advice instanceof MethodInterceptor) {
-		interceptors.add((MethodInterceptor) advice);
-	}
-	for (AdvisorAdapter adapter : this.adapters) {
-		if (adapter.supportsAdvice(advice)) {
-			interceptors.add(adapter.getInterceptor(advisor));
-		}
-	}
-	if (interceptors.isEmpty()) {
-		throw new UnknownAdviceTypeException(advisor.getAdvice());
-	}
-	return interceptors.toArray(new MethodInterceptor[interceptors.size()]);
+    List<MethodInterceptor> interceptors = new ArrayList<MethodInterceptor>(3);
+    Advice advice = advisor.getAdvice();
+    if (advice instanceof MethodInterceptor) {
+        interceptors.add((MethodInterceptor) advice);
+    }
+    for (AdvisorAdapter adapter : this.adapters) {
+        if (adapter.supportsAdvice(advice)) {
+            interceptors.add(adapter.getInterceptor(advisor));
+        }
+    }
+    if (interceptors.isEmpty()) {
+        throw new UnknownAdviceTypeException(advisor.getAdvice());
+    }
+    return interceptors.toArray(new MethodInterceptor[interceptors.size()]);
 }
 ```
 
@@ -265,25 +265,25 @@ ReflectiveMethodInvocation.proceed:
 ```java
 @Override
 public Object proceed() throws Throwable {
-	if (this.currentInterceptorIndex == this.interceptorsAndDynamicMethodMatchers.size() - 1) {
-      	//拦截器执行完毕，调用原本的方法
-		return invokeJoinpoint();
-	}
-	Object interceptorOrInterceptionAdvice =
-			this.interceptorsAndDynamicMethodMatchers.get(++this.currentInterceptorIndex);
-	if (interceptorOrInterceptionAdvice instanceof InterceptorAndDynamicMethodMatcher) {
-		InterceptorAndDynamicMethodMatcher dm =
-				(InterceptorAndDynamicMethodMatcher) interceptorOrInterceptionAdvice;
-		if (dm.methodMatcher.matches(this.method, this.targetClass, this.arguments)) {
-			return dm.interceptor.invoke(this);
-		} else {
-			// Dynamic matching failed.
-			return proceed();
-		}
-	} else {
-      	//调用拦截器的invoke方法
-		return ((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);
-	}
+    if (this.currentInterceptorIndex == this.interceptorsAndDynamicMethodMatchers.size() - 1) {
+        //拦截器执行完毕，调用原本的方法
+        return invokeJoinpoint();
+    }
+    Object interceptorOrInterceptionAdvice =
+            this.interceptorsAndDynamicMethodMatchers.get(++this.currentInterceptorIndex);
+    if (interceptorOrInterceptionAdvice instanceof InterceptorAndDynamicMethodMatcher) {
+        InterceptorAndDynamicMethodMatcher dm =
+                (InterceptorAndDynamicMethodMatcher) interceptorOrInterceptionAdvice;
+        if (dm.methodMatcher.matches(this.method, this.targetClass, this.arguments)) {
+            return dm.interceptor.invoke(this);
+        } else {
+            // Dynamic matching failed.
+            return proceed();
+        }
+    } else {
+        //调用拦截器的invoke方法
+        return ((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);
+    }
 }
 ```
 
@@ -296,16 +296,16 @@ invoke方法:
 ```java
 @Override
 public Object invoke(final MethodInvocation invocation) throws Throwable {
-	Class<?> targetClass = (invocation.getThis() != null ? 
+    Class<?> targetClass = (invocation.getThis() != null ? 
              AopUtils.getTargetClass(invocation.getThis()) : null);
-	// Adapt to TransactionAspectSupport's invokeWithinTransaction...
-	return invokeWithinTransaction(invocation.getMethod(), targetClass, new InvocationCallback() {
-		@Override
-		public Object proceedWithInvocation() throws Throwable {
-          	//事务执行完毕后调用链继续向下执行
-			return invocation.proceed();
-		}
-	});
+    // Adapt to TransactionAspectSupport's invokeWithinTransaction...
+    return invokeWithinTransaction(invocation.getMethod(), targetClass, new InvocationCallback() {
+        @Override
+        public Object proceedWithInvocation() throws Throwable {
+            //事务执行完毕后调用链继续向下执行
+            return invocation.proceed();
+        }
+    });
 }
 ```
 
@@ -313,30 +313,30 @@ invokeWithinTransaction简略版源码(仅保留PlatformTransactionManager部分
 
 ```java
 protected Object invokeWithinTransaction(Method method, Class<?> targetClass, final InvocationCallback invocation){
-	// If the transaction attribute is null, the method is non-transactional.
-	final TransactionAttribute txAttr = getTransactionAttributeSource()
-      	.getTransactionAttribute(method, targetClass);
-	final PlatformTransactionManager tm = determineTransactionManager(txAttr);
-  	//得到方法名
-	final String joinpointIdentification = methodIdentification(method, targetClass);
-	if (txAttr == null || !(tm instanceof CallbackPreferringPlatformTransactionManager)) {
-		// Standard transaction demarcation with getTransaction and commit/rollback calls.
-		TransactionInfo txInfo = createTransactionIfNecessary(tm, txAttr, joinpointIdentification);
-		Object retVal = null;
-		try {
-			// This is an around advice: Invoke the next interceptor in the chain.
-			// This will normally result in a target object being invoked.
-			retVal = invocation.proceedWithInvocation();
-		} catch (Throwable ex) {
-			// target invocation exception
-			completeTransactionAfterThrowing(txInfo, ex);
-			throw ex;
-		} finally {
-			cleanupTransactionInfo(txInfo);
-		}
-		commitTransactionAfterReturning(txInfo);
-		return retVal;
-	}
+    // If the transaction attribute is null, the method is non-transactional.
+    final TransactionAttribute txAttr = getTransactionAttributeSource()
+        .getTransactionAttribute(method, targetClass);
+    final PlatformTransactionManager tm = determineTransactionManager(txAttr);
+    //得到方法名
+    final String joinpointIdentification = methodIdentification(method, targetClass);
+    if (txAttr == null || !(tm instanceof CallbackPreferringPlatformTransactionManager)) {
+        // Standard transaction demarcation with getTransaction and commit/rollback calls.
+        TransactionInfo txInfo = createTransactionIfNecessary(tm, txAttr, joinpointIdentification);
+        Object retVal = null;
+        try {
+            // This is an around advice: Invoke the next interceptor in the chain.
+            // This will normally result in a target object being invoked.
+            retVal = invocation.proceedWithInvocation();
+        } catch (Throwable ex) {
+            // target invocation exception
+            completeTransactionAfterThrowing(txInfo, ex);
+            throw ex;
+        } finally {
+            cleanupTransactionInfo(txInfo);
+        }
+        commitTransactionAfterReturning(txInfo);
+        return retVal;
+    }
 }
 ```
 
@@ -346,27 +346,27 @@ determineTransactionManager方法用以确定使用的事务管理器:
 
 ```java
 protected PlatformTransactionManager determineTransactionManager(TransactionAttribute txAttr) {
-	//如果没有事务属性，那么仅从缓存中查找，找不到返回null
-	if (txAttr == null || this.beanFactory == null) {
-		return getTransactionManager();
-	}
-	String qualifier = txAttr.getQualifier();
-  	//如果@Transactional注解配置了transactionManager或value属性(用以决定使用哪个事务管理器):
-  	//首先查找缓存，找不到再去容器中按名称寻找
-	if (StringUtils.hasText(qualifier)) {
-		return determineQualifiedTransactionManager(qualifier);
-	} else if (StringUtils.hasText(this.transactionManagerBeanName)) {
-		return determineQualifiedTransactionManager(this.transactionManagerBeanName);
-	} else {
-      	//去容器中按类型(Class)查找
-		PlatformTransactionManager defaultTransactionManager = getTransactionManager();
-		if (defaultTransactionManager == null) {
-			defaultTransactionManager = this.beanFactory.getBean(PlatformTransactionManager.class);
-			this.transactionManagerCache.putIfAbsent(
-					DEFAULT_TRANSACTION_MANAGER_KEY, defaultTransactionManager);
-		}
-		return defaultTransactionManager;
-	}
+    //如果没有事务属性，那么仅从缓存中查找，找不到返回null
+    if (txAttr == null || this.beanFactory == null) {
+        return getTransactionManager();
+    }
+    String qualifier = txAttr.getQualifier();
+    //如果@Transactional注解配置了transactionManager或value属性(用以决定使用哪个事务管理器):
+    //首先查找缓存，找不到再去容器中按名称寻找
+    if (StringUtils.hasText(qualifier)) {
+        return determineQualifiedTransactionManager(qualifier);
+    } else if (StringUtils.hasText(this.transactionManagerBeanName)) {
+        return determineQualifiedTransactionManager(this.transactionManagerBeanName);
+    } else {
+        //去容器中按类型(Class)查找
+        PlatformTransactionManager defaultTransactionManager = getTransactionManager();
+        if (defaultTransactionManager == null) {
+            defaultTransactionManager = this.beanFactory.getBean(PlatformTransactionManager.class);
+            this.transactionManagerCache.putIfAbsent(
+                    DEFAULT_TRANSACTION_MANAGER_KEY, defaultTransactionManager);
+        }
+        return defaultTransactionManager;
+    }
 }
 ```
 
@@ -392,23 +392,23 @@ TransactionAspectSupport.createTransactionIfNecessary:
 
 ```java
 protected TransactionInfo createTransactionIfNecessary(
-	PlatformTransactionManager tm, TransactionAttribute txAttr, final String joinpointIdentification) {
-	// If no name specified, apply method identification as transaction name.
-	if (txAttr != null && txAttr.getName() == null) {
-		txAttr = new DelegatingTransactionAttribute(txAttr) {
-			@Override
-			public String getName() {
-				return joinpointIdentification;
-			}
-		};
-	}
-	TransactionStatus status = null;
-	if (txAttr != null) {
-		if (tm != null) {
-			status = tm.getTransaction(txAttr);
-		}
-	}
-	return prepareTransactionInfo(tm, txAttr, joinpointIdentification, status);
+    PlatformTransactionManager tm, TransactionAttribute txAttr, final String joinpointIdentification) {
+    // If no name specified, apply method identification as transaction name.
+    if (txAttr != null && txAttr.getName() == null) {
+        txAttr = new DelegatingTransactionAttribute(txAttr) {
+            @Override
+            public String getName() {
+                return joinpointIdentification;
+            }
+        };
+    }
+    TransactionStatus status = null;
+    if (txAttr != null) {
+        if (tm != null) {
+            status = tm.getTransaction(txAttr);
+        }
+    }
+    return prepareTransactionInfo(tm, txAttr, joinpointIdentification, status);
 }
 ```
 
@@ -422,21 +422,21 @@ protected TransactionInfo createTransactionIfNecessary(
 
 ```java
 private static Object doGetResource(Object actualKey) {
-	Map<Object, Object> map = resources.get();
-	if (map == null) {
-		return null;
-	}
-	Object value = map.get(actualKey);
-	// Transparently remove ResourceHolder that was marked as void...
-	if (value instanceof ResourceHolder && ((ResourceHolder) value).isVoid()) {
-		map.remove(actualKey);
-		// Remove entire ThreadLocal if empty...
-		if (map.isEmpty()) {
-			resources.remove();
-		}
-		value = null;
-	}
-	return value;
+    Map<Object, Object> map = resources.get();
+    if (map == null) {
+        return null;
+    }
+    Object value = map.get(actualKey);
+    // Transparently remove ResourceHolder that was marked as void...
+    if (value instanceof ResourceHolder && ((ResourceHolder) value).isVoid()) {
+        map.remove(actualKey);
+        // Remove entire ThreadLocal if empty...
+        if (map.isEmpty()) {
+            resources.remove();
+        }
+        value = null;
+    }
+    return value;
 }
 ```
 
@@ -444,7 +444,7 @@ actualKey实际上是DataSource对象，resources是一个ThreadLocal对象，�
 
 ```java
 private static final ThreadLocal<Map<Object, Object>> resources =
-			new NamedThreadLocal<Map<Object, Object>>("Transactional resources");
+            new NamedThreadLocal<Map<Object, Object>>("Transactional resources");
 ```
 
 从这里可以得出结论:
@@ -461,8 +461,8 @@ private static final ThreadLocal<Map<Object, Object>> resources =
 
 ```java
 if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NEVER) {
-	throw new IllegalTransactionStateException(
-		"Existing transaction found for transaction marked with propagation 'never'");
+    throw new IllegalTransactionStateException(
+        "Existing transaction found for transaction marked with propagation 'never'");
 }
 ```
 
@@ -472,10 +472,10 @@ if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NEV
 
 ```java
 if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NOT_SUPPORTED) {
-	Object suspendedResources = suspend(transaction);
-	boolean newSynchronization = (getTransactionSynchronization() == SYNCHRONIZATION_ALWAYS);
-	return prepareTransactionStatus(
-		definition, null, false, newSynchronization, debugEnabled, suspendedResources);
+    Object suspendedResources = suspend(transaction);
+    boolean newSynchronization = (getTransactionSynchronization() == SYNCHRONIZATION_ALWAYS);
+    return prepareTransactionStatus(
+        definition, null, false, newSynchronization, debugEnabled, suspendedResources);
 }
 ```
 
@@ -485,20 +485,20 @@ if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NOT
 
 ```java
 private static Object doUnbindResource(Object actualKey) {
-	Map<Object, Object> map = resources.get();
-	if (map == null) {
-		return null;
-	}
-	Object value = map.remove(actualKey);
-	// Remove entire ThreadLocal if empty...
-	if (map.isEmpty()) {
-		resources.remove();
-	}
-	// Transparently suppress a ResourceHolder that was marked as void...
-	if (value instanceof ResourceHolder && ((ResourceHolder) value).isVoid()) {
-		value = null;
-	}
-	return value;
+    Map<Object, Object> map = resources.get();
+    if (map == null) {
+        return null;
+    }
+    Object value = map.remove(actualKey);
+    // Remove entire ThreadLocal if empty...
+    if (map.isEmpty()) {
+        resources.remove();
+    }
+    // Transparently suppress a ResourceHolder that was marked as void...
+    if (value instanceof ResourceHolder && ((ResourceHolder) value).isVoid()) {
+        value = null;
+    }
+    return value;
 }
 ```
 
@@ -513,11 +513,11 @@ DataSourceTransactionManager.doSuspend:
 ```java
 @Override
 protected Object doSuspend(Object transaction) {
-	DataSourceTransactionObject txObject = (DataSourceTransactionObject) transaction;
-	txObject.setConnectionHolder(null);
-	ConnectionHolder conHolder = (ConnectionHolder)
-			TransactionSynchronizationManager.unbindResource(this.dataSource);
-	return conHolder;
+    DataSourceTransactionObject txObject = (DataSourceTransactionObject) transaction;
+    txObject.setConnectionHolder(null);
+    ConnectionHolder conHolder = (ConnectionHolder)
+            TransactionSynchronizationManager.unbindResource(this.dataSource);
+    return conHolder;
 }
 ```
 
@@ -527,13 +527,13 @@ protected Object doSuspend(Object transaction) {
 
 ```java
 if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRES_NEW) {
-	SuspendedResourcesHolder suspendedResources = suspend(transaction);
-	boolean newSynchronization = (getTransactionSynchronization() != SYNCHRONIZATION_NEVER);
-	DefaultTransactionStatus status = newTransactionStatus(
-			definition, transaction, true, newSynchronization, debugEnabled, suspendedResources);
-	doBegin(transaction, definition);
-	prepareSynchronization(status, definition);
-	return status;
+    SuspendedResourcesHolder suspendedResources = suspend(transaction);
+    boolean newSynchronization = (getTransactionSynchronization() != SYNCHRONIZATION_NEVER);
+    DefaultTransactionStatus status = newTransactionStatus(
+            definition, transaction, true, newSynchronization, debugEnabled, suspendedResources);
+    doBegin(transaction, definition);
+    prepareSynchronization(status, definition);
+    return status;
 }
 ```
 
@@ -551,15 +551,15 @@ if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQ
 
 ```java
 if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NESTED) {
-	if (useSavepointForNestedTransaction()) {
-		// Create savepoint within existing Spring-managed transaction,
-		// through the SavepointManager API implemented by TransactionStatus.
-		// Usually uses JDBC 3.0 savepoints. Never activates Spring synchronization.
-		DefaultTransactionStatus status =
-			prepareTransactionStatus(definition, transaction, false, false, debugEnabled, null);
-		status.createAndHoldSavepoint();
-		return status;
-	}
+    if (useSavepointForNestedTransaction()) {
+        // Create savepoint within existing Spring-managed transaction,
+        // through the SavepointManager API implemented by TransactionStatus.
+        // Usually uses JDBC 3.0 savepoints. Never activates Spring synchronization.
+        DefaultTransactionStatus status =
+            prepareTransactionStatus(definition, transaction, false, false, debugEnabled, null);
+        status.createAndHoldSavepoint();
+        return status;
+    }
 }
 ```
 
@@ -567,7 +567,7 @@ if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NES
 
 ```java
 public void createAndHoldSavepoint() throws TransactionException {
-	setSavepoint(getSavepointManager().createSavepoint());
+    setSavepoint(getSavepointManager().createSavepoint());
 }
 ```
 
@@ -576,11 +576,11 @@ DefaultTransactionStatus.getSavepointManager:
 ```java
 @Override
 protected SavepointManager getSavepointManager() {
-	if (!isTransactionSavepointManager()) {
-		throw new NestedTransactionNotSupportedException(
-			"Transaction object [" + getTransaction() + "] does not support savepoints");
-	}
-	return (SavepointManager) getTransaction();
+    if (!isTransactionSavepointManager()) {
+        throw new NestedTransactionNotSupportedException(
+            "Transaction object [" + getTransaction() + "] does not support savepoints");
+    }
+    return (SavepointManager) getTransaction();
 }
 ```
 
@@ -597,7 +597,7 @@ protected SavepointManager getSavepointManager() {
     ```java
     @Component
     public class TransactionBean {
-      	private NestedBean nestedBean;
+        private NestedBean nestedBean;
         public NestedBean getNestedBean() {
             return nestedBean;
         }
@@ -630,7 +630,7 @@ protected SavepointManager getSavepointManager() {
   ```xml
   <bean id="nestedBean" class="base.transaction.NestedBean" />
   <bean class="base.transaction.TransactionBean">
-  	<property name="nestedBean" ref="nestedBean" />
+    <property name="nestedBean" ref="nestedBean" />
   </bean>
   ```
 
@@ -638,7 +638,7 @@ protected SavepointManager getSavepointManager() {
 
   ```java
   public static void main(String[] args) {
-  	ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("config.xml");
+    ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("config.xml");
       TransactionBean bean = context.getBean(TransactionBean.class);
       bean.process();
   }
@@ -673,8 +673,8 @@ JdbcTransactionObjectSupport.createSavepoint简略版源码:
 ```java
 @Override
 public Object createSavepoint() throws TransactionException {
-	ConnectionHolder conHolder = getConnectionHolderForSavepoint();
-	return conHolder.createSavepoint();
+    ConnectionHolder conHolder = getConnectionHolderForSavepoint();
+    return conHolder.createSavepoint();
 }
 ```
 
@@ -682,8 +682,8 @@ ConnectionHolder.createSavepoint:
 
 ```java
 public Savepoint createSavepoint() throws SQLException {
-	this.savepointCounter++;
-	return getConnection().setSavepoint(SAVEPOINT_NAME_PREFIX + this.savepointCounter);
+    this.savepointCounter++;
+    return getConnection().setSavepoint(SAVEPOINT_NAME_PREFIX + this.savepointCounter);
 }
 ```
 
@@ -702,36 +702,36 @@ public Savepoint createSavepoint() throws SQLException {
 ```java
 @Override
 protected void doBegin(Object transaction, TransactionDefinition definition) {
-  	//此时，txObject不为null，只是其核心的ConnectHolder属性为null
-	DataSourceTransactionObject txObject = (DataSourceTransactionObject) transaction;
-	Connection con = null;
-	if (txObject.getConnectionHolder() == null ||
-			txObject.getConnectionHolder().isSynchronizedWithTransaction()) {
-		Connection newCon = this.dataSource.getConnection();
-      	//获得连接，可以看出ConnectionHolder是对Connection的包装
-		txObject.setConnectionHolder(new ConnectionHolder(newCon), true);
-	}
-	txObject.getConnectionHolder().setSynchronizedWithTransaction(true);
-	con = txObject.getConnectionHolder().getConnection();
-  	//设置是否只读和隔离级别
-	Integer previousIsolationLevel = DataSourceUtils.prepareConnectionForTransaction(con, definition);
-	txObject.setPreviousIsolationLevel(previousIsolationLevel);
-	// Switch to manual commit if necessary. This is very expensive in some JDBC drivers,
-	// so we don't want to do it unnecessarily (for example if we've explicitly
-	// configured the connection pool to set it already).
-	if (con.getAutoCommit()) {
-		txObject.setMustRestoreAutoCommit(true);
-		con.setAutoCommit(false);
-	}
-	txObject.getConnectionHolder().setTransactionActive(true);
-	int timeout = determineTimeout(definition);
-	if (timeout != TransactionDefinition.TIMEOUT_DEFAULT) {
-		txObject.getConnectionHolder().setTimeoutInSeconds(timeout);
-	}
-	// Bind the session holder to the thread.
-	if (txObject.isNewConnectionHolder()) {
-		TransactionSynchronizationManager.bindResource(getDataSource(), txObject.getConnectionHolder());
-	}
+    //此时，txObject不为null，只是其核心的ConnectHolder属性为null
+    DataSourceTransactionObject txObject = (DataSourceTransactionObject) transaction;
+    Connection con = null;
+    if (txObject.getConnectionHolder() == null ||
+            txObject.getConnectionHolder().isSynchronizedWithTransaction()) {
+        Connection newCon = this.dataSource.getConnection();
+        //获得连接，可以看出ConnectionHolder是对Connection的包装
+        txObject.setConnectionHolder(new ConnectionHolder(newCon), true);
+    }
+    txObject.getConnectionHolder().setSynchronizedWithTransaction(true);
+    con = txObject.getConnectionHolder().getConnection();
+    //设置是否只读和隔离级别
+    Integer previousIsolationLevel = DataSourceUtils.prepareConnectionForTransaction(con, definition);
+    txObject.setPreviousIsolationLevel(previousIsolationLevel);
+    // Switch to manual commit if necessary. This is very expensive in some JDBC drivers,
+    // so we don't want to do it unnecessarily (for example if we've explicitly
+    // configured the connection pool to set it already).
+    if (con.getAutoCommit()) {
+        txObject.setMustRestoreAutoCommit(true);
+        con.setAutoCommit(false);
+    }
+    txObject.getConnectionHolder().setTransactionActive(true);
+    int timeout = determineTimeout(definition);
+    if (timeout != TransactionDefinition.TIMEOUT_DEFAULT) {
+        txObject.getConnectionHolder().setTimeoutInSeconds(timeout);
+    }
+    // Bind the session holder to the thread.
+    if (txObject.isNewConnectionHolder()) {
+        TransactionSynchronizationManager.bindResource(getDataSource(), txObject.getConnectionHolder());
+    }
 }
 ```
 

@@ -4,12 +4,12 @@
 
 ```java
 LoadingCache<String, String> cache = CacheBuilder.newBuilder().maximumSize(2)
-	.build(new CacheLoader<String, String>() {
-		@Override
+    .build(new CacheLoader<String, String>() {
+        @Override
          public String load(String s) throws Exception {
-         	return "Hello: " + s;
-		}
-	});
+            return "Hello: " + s;
+        }
+    });
 ```
 
 创建的关键便在于build方法,build方法的核心逻辑位于LocalCache构造器，构造器完成了两件事:
@@ -40,7 +40,7 @@ Segment代表了其中的一段。其类图(部分):
 ```java
 LocalCache(
       CacheBuilder<? super K, ? super V> builder, @Nullable CacheLoader<? super K, V> loader) {
-	concurrencyLevel = Math.min(builder.getConcurrencyLevel(), MAX_SEGMENTS);
+    concurrencyLevel = Math.min(builder.getConcurrencyLevel(), MAX_SEGMENTS);
     int segmentCount = 1;
     while (segmentCount < concurrencyLevel && (!evictsBySize() || segmentCount * 20 <= maxWeight)) {
       ++segmentShift;
@@ -64,14 +64,14 @@ ReferenceEntry是guava-cache中实际进行存储的数据结构，其类图:
 ```java
 LocalCache(
       CacheBuilder<? super K, ? super V> builder, @Nullable CacheLoader<? super K, V> loader) {
-  	int segmentCapacity = initialCapacity / segmentCount;
+    int segmentCapacity = initialCapacity / segmentCount;
     if (segmentCapacity * segmentCount < initialCapacity) {
       ++segmentCapacity;
     }
-	int segmentSize = 1;
-	while (segmentSize < segmentCapacity) {
-		segmentSize <<= 1;
-	}
+    int segmentSize = 1;
+    while (segmentSize < segmentCapacity) {
+        segmentSize <<= 1;
+    }
 }
 ```
 
@@ -84,23 +84,23 @@ initialCapacity由CacheBuilder的同名方法进行设置，默认16.
 ```java
 LocalCache(
       CacheBuilder<? super K, ? super V> builder, @Nullable CacheLoader<? super K, V> loader) {
-	if (evictsBySize()) {
-		// Ensure sum of segment max weights = overall max weights
-		long maxSegmentWeight = maxWeight / segmentCount + 1;
-		long remainder = maxWeight % segmentCount;
-		for (int i = 0; i < this.segments.length; ++i) {
-			if (i == remainder) {
-				maxSegmentWeight--;
-			}
-        	this.segments[i] =
-            	createSegment(segmentSize, maxSegmentWeight, builder.getStatsCounterSupplier().get());
-      	}
+    if (evictsBySize()) {
+        // Ensure sum of segment max weights = overall max weights
+        long maxSegmentWeight = maxWeight / segmentCount + 1;
+        long remainder = maxWeight % segmentCount;
+        for (int i = 0; i < this.segments.length; ++i) {
+            if (i == remainder) {
+                maxSegmentWeight--;
+            }
+            this.segments[i] =
+                createSegment(segmentSize, maxSegmentWeight, builder.getStatsCounterSupplier().get());
+        }
     } else {
-		for (int i = 0; i < this.segments.length; ++i) {
+        for (int i = 0; i < this.segments.length; ++i) {
          this.segments[i] =
             createSegment(segmentSize, UNSET_INT, builder.getStatsCounterSupplier().get());
-		}
-	}
+        }
+    }
 }
 ```
 
@@ -119,7 +119,7 @@ createSegment其实就是对Segment构造器的调用，此构造器主要做了
 
 ```java
 Segment(LocalCache<K, V> map, int initialCapacity, long maxSegmentWeight, StatsCounter statsCounter) {
-	 initTable(newEntryArray(initialCapacity));
+     initTable(newEntryArray(initialCapacity));
 }
 ```
 
@@ -129,8 +129,8 @@ newEntryArray方法只是创建了一个initialCapacity大小的数组，关键�
 void initTable(AtomicReferenceArray<ReferenceEntry<K, V>> newTable) {
   this.threshold = newTable.length() * 3 / 4; // 0.75
   if (!map.customWeigher() && this.threshold == maxSegmentWeight) {
-	// prevent spurious expansion before eviction
-	this.threshold++;
+    // prevent spurious expansion before eviction
+    this.threshold++;
   }
   this.table = newTable;
 }
@@ -144,21 +144,21 @@ void initTable(AtomicReferenceArray<ReferenceEntry<K, V>> newTable) {
 
 ```java
 Segment(LocalCache<K, V> map, int initialCapacity, long maxSegmentWeight, StatsCounter statsCounter) {
-  	//当不是强引用的时候成立
-	keyReferenceQueue = map.usesKeyReferences() ? new ReferenceQueue<K>() : null;
-	valueReferenceQueue = map.usesValueReferences() ? new ReferenceQueue<V>() : null;
-	recencyQueue =
-  		map.usesAccessQueue()
-	  	? new ConcurrentLinkedQueue<ReferenceEntry<K, V>>()
-	  	: LocalCache.<ReferenceEntry<K, V>>discardingQueue();
-	writeQueue =
-  		map.usesWriteQueue()
-	  	? new WriteQueue<K, V>()
-	  	: LocalCache.<ReferenceEntry<K, V>>discardingQueue();
-	accessQueue =
-  		map.usesAccessQueue()
-	  	? new AccessQueue<K, V>()
-	  	: LocalCache.<ReferenceEntry<K, V>>discardingQueue();
+    //当不是强引用的时候成立
+    keyReferenceQueue = map.usesKeyReferences() ? new ReferenceQueue<K>() : null;
+    valueReferenceQueue = map.usesValueReferences() ? new ReferenceQueue<V>() : null;
+    recencyQueue =
+        map.usesAccessQueue()
+        ? new ConcurrentLinkedQueue<ReferenceEntry<K, V>>()
+        : LocalCache.<ReferenceEntry<K, V>>discardingQueue();
+    writeQueue =
+        map.usesWriteQueue()
+        ? new WriteQueue<K, V>()
+        : LocalCache.<ReferenceEntry<K, V>>discardingQueue();
+    accessQueue =
+        map.usesAccessQueue()
+        ? new AccessQueue<K, V>()
+        : LocalCache.<ReferenceEntry<K, V>>discardingQueue();
 }
 ```
 
@@ -170,7 +170,7 @@ usesKeyReferences源码:
 
 ```java
 boolean usesKeyReferences() {
-	return keyStrength != Strength.STRONG;
+    return keyStrength != Strength.STRONG;
 }
 ```
 
@@ -178,7 +178,7 @@ keyStrength通过CacheBuilder.getKeyStrength获取:
 
 ```java
 Strength getKeyStrength() {
-	return MoreObjects.firstNonNull(keyStrength, Strength.STRONG);
+    return MoreObjects.firstNonNull(keyStrength, Strength.STRONG);
 }
 ```
 
@@ -193,7 +193,7 @@ LocalCache.put:
 ```java
 @Override
 public V put(K key, V value) {
-	checkNotNull(key);
+    checkNotNull(key);
     checkNotNull(value);
     int hash = hash(key);
     return segmentFor(hash).put(key, hash, value, false);
@@ -221,7 +221,7 @@ keyEquivalence属性由CacheBuilder的getKeyEquivalence方法获得:
 
 ```java
 Equivalence<Object> getKeyEquivalence() {
-	return MoreObjects.firstNonNull(keyEquivalence, getKeyStrength().defaultEquivalence());
+    return MoreObjects.firstNonNull(keyEquivalence, getKeyStrength().defaultEquivalence());
 }
 ```
 
@@ -229,24 +229,24 @@ Equivalence<Object> getKeyEquivalence() {
 
 ```java
 enum Strength {
-	STRONG {
-		@Override
-		Equivalence<Object> defaultEquivalence() {
-			return Equivalence.equals();
-		}
-	},
-	SOFT {
-		@Override
-		Equivalence<Object> defaultEquivalence() {
-			return Equivalence.identity();
-		}
-	},
-	WEAK {
-		@Override
-		Equivalence<Object> defaultEquivalence() {
-			return Equivalence.identity();
-		}
-	}
+    STRONG {
+        @Override
+        Equivalence<Object> defaultEquivalence() {
+            return Equivalence.equals();
+        }
+    },
+    SOFT {
+        @Override
+        Equivalence<Object> defaultEquivalence() {
+            return Equivalence.identity();
+        }
+    },
+    WEAK {
+        @Override
+        Equivalence<Object> defaultEquivalence() {
+            return Equivalence.identity();
+        }
+    }
 };
 ```
 
@@ -255,21 +255,21 @@ enum Strength {
 ```java
 static final class Equals extends Equivalence<Object> implements Serializable {
 
-	static final Equals INSTANCE = new Equals();
+    static final Equals INSTANCE = new Equals();
 
-	@Override
-	protected boolean doEquivalent(Object a, Object b) {
-		return a.equals(b);
-	}
+    @Override
+    protected boolean doEquivalent(Object a, Object b) {
+        return a.equals(b);
+    }
 
-	@Override
-	protected int doHash(Object o) {
-		return o.hashCode();
-	}
+    @Override
+    protected int doHash(Object o) {
+        return o.hashCode();
+    }
 
-	private Object readResolve() {
-		return INSTANCE;
-	}
+    private Object readResolve() {
+        return INSTANCE;
+    }
 }
 ```
 
@@ -279,18 +279,18 @@ static final class Equals extends Equivalence<Object> implements Serializable {
 
 ```java
 static final class Identity extends Equivalence<Object> implements Serializable {
-	static final Identity INSTANCE = new Identity();
-	@Override
-	protected boolean doEquivalent(Object a, Object b) {
-		return false;
-	}
-	@Override
-	protected int doHash(Object o) {
-		return System.identityHashCode(o);
-	}
-	private Object readResolve() {
-		return INSTANCE;
-	}
+    static final Identity INSTANCE = new Identity();
+    @Override
+    protected boolean doEquivalent(Object a, Object b) {
+        return false;
+    }
+    @Override
+    protected int doHash(Object o) {
+        return System.identityHashCode(o);
+    }
+    private Object readResolve() {
+        return INSTANCE;
+    }
 }
 ```
 
@@ -308,7 +308,7 @@ LocalCache.segmentFor:
 
 ```java
 Segment<K, V> segmentFor(int hash) {
-	return segments[(hash >>> segmentShift) & segmentMask];
+    return segments[(hash >>> segmentShift) & segmentMask];
 }
 ```
 
@@ -318,8 +318,8 @@ segmentShift和segmentMask的取值，LocalCache构造器源码:
 int segmentShift = 0;
 int segmentCount = 1;
 while (segmentCount < concurrencyLevel && (!evictsBySize() || segmentCount * 20 <= maxWeight)) {
-	++segmentShift;
-	segmentCount <<= 1;
+    ++segmentShift;
+    segmentCount <<= 1;
 }
 this.segmentShift = 32 - segmentShift;
 segmentMask = segmentCount - 1;
@@ -338,13 +338,13 @@ segmentMask = segmentCount - 1;
 ```java
 @Nullable
 V put(K key, int hash, V value, boolean onlyIfAbsent) {
-	lock();
-	try {
-		//...
+    lock();
+    try {
+        //...
     } finally {
-		unlock();
+        unlock();
         postWriteCleanup();
-	}
+    }
 }
 ```
 
@@ -363,16 +363,16 @@ ticker.read方法返回的实际上就是System.nanoTime的值。preWriteCleanup
 
 ```java
 void runLockedCleanup(long now) {
-  	//必定通过
-	if (tryLock()) {
-    	try {
-			drainReferenceQueues();
-			expireEntries(now); // calls drainRecencyQueue
-          	readCount.set(0);
+    //必定通过
+    if (tryLock()) {
+        try {
+            drainReferenceQueues();
+            expireEntries(now); // calls drainRecencyQueue
+            readCount.set(0);
         } finally {
-			unlock();
+            unlock();
         }
-	}
+    }
 }
 ```
 
@@ -385,12 +385,12 @@ drainReferenceQueues:
 ```java
 @GuardedBy("this")
 void drainReferenceQueues() {
-	if (map.usesKeyReferences()) {
-    	drainKeyReferenceQueue();
-	}
-	if (map.usesValueReferences()) {
-    	drainValueReferenceQueue();
-	}
+    if (map.usesKeyReferences()) {
+        drainKeyReferenceQueue();
+    }
+    if (map.usesValueReferences()) {
+        drainValueReferenceQueue();
+    }
 }
 ```
 
@@ -399,16 +399,16 @@ void drainReferenceQueues() {
 ```java
 @GuardedBy("this")
 void drainKeyReferenceQueue() {
-	Reference<? extends K> ref;
-	int i = 0;
+    Reference<? extends K> ref;
+    int i = 0;
     while ((ref = keyReferenceQueue.poll()) != null) {
-    	@SuppressWarnings("unchecked")
+        @SuppressWarnings("unchecked")
         ReferenceEntry<K, V> entry = (ReferenceEntry<K, V>) ref;
         map.reclaimKey(entry);
         if (++i == DRAIN_MAX) {
-        	break;
+            break;
         }
-	}
+    }
 }
 ```
 
@@ -418,36 +418,36 @@ reclaimKey用于清理ReferenceEntry对象，因为**keyReference和valueReferen
 
 ```java
 boolean reclaimKey(ReferenceEntry<K, V> entry, int hash) {
-	lock();
-	try {
+    lock();
+    try {
         int newCount = count - 1;
         AtomicReferenceArray<ReferenceEntry<K, V>> table = this.table;
         int index = hash & (table.length() - 1);
         ReferenceEntry<K, V> first = table.get(index);
 
         for (ReferenceEntry<K, V> e = first; e != null; e = e.getNext()) {
-			if (e == entry) {
-            	++modCount;
-            	ReferenceEntry<K, V> newFirst =
-                	removeValueFromChain(
-                    	first,
-                    	e,
-                    	e.getKey(),
-                    	hash,
-                    	e.getValueReference().get(),
-                    	e.getValueReference(),
-                    	RemovalCause.COLLECTED);
-            	newCount = this.count - 1;
-            	table.set(index, newFirst);
-            	this.count = newCount; // write-volatile
-            	return true;
-			}
-		}
-		return false;
-	} finally {
+            if (e == entry) {
+                ++modCount;
+                ReferenceEntry<K, V> newFirst =
+                    removeValueFromChain(
+                        first,
+                        e,
+                        e.getKey(),
+                        hash,
+                        e.getValueReference().get(),
+                        e.getValueReference(),
+                        RemovalCause.COLLECTED);
+                newCount = this.count - 1;
+                table.set(index, newFirst);
+                this.count = newCount; // write-volatile
+                return true;
+            }
+        }
+        return false;
+    } finally {
         unlock();
         postWriteCleanup();
-	}
+    }
 }
 ```
 
@@ -460,19 +460,19 @@ removeValueFromChain:
 
 ```java
 ReferenceEntry<K, V> removeValueFromChain(
-	ReferenceEntry<K, V> first,
-	ReferenceEntry<K, V> entry,
-	@Nullable K key,
-	int hash, V value, ValueReference<K, V> valueReference, RemovalCause cause) {
-		enqueueNotification(key, hash, value, valueReference.getWeight(), cause);
-      	writeQueue.remove(entry);
-      	accessQueue.remove(entry);
-      	if (valueReference.isLoading()) {
-       		valueReference.notifyNewValue(null);
-        	return first;
-      	} else {
-        	return removeEntryFromChain(first, entry);
-      	}
+    ReferenceEntry<K, V> first,
+    ReferenceEntry<K, V> entry,
+    @Nullable K key,
+    int hash, V value, ValueReference<K, V> valueReference, RemovalCause cause) {
+        enqueueNotification(key, hash, value, valueReference.getWeight(), cause);
+        writeQueue.remove(entry);
+        accessQueue.remove(entry);
+        if (valueReference.isLoading()) {
+            valueReference.notifyNewValue(null);
+            return first;
+        } else {
+            return removeEntryFromChain(first, entry);
+        }
 }
 ```
 
@@ -483,16 +483,16 @@ enqueueNotification用于进行一些移除之后的善后工作(然而却是在
 ```java
 @GuardedBy("this")
 void enqueueNotification(@Nullable K key, int hash, @Nullable V value, int weight, RemovalCause cause) {
-  	//减少权重
-	totalWeight -= weight;
-  	//分析统计
-	if (cause.wasEvicted()) {
-		statsCounter.recordEviction();
-	}
-	if (map.removalNotificationQueue != DISCARDING_QUEUE) {
-		RemovalNotification<K, V> notification = RemovalNotification.create(key, value, cause);
+    //减少权重
+    totalWeight -= weight;
+    //分析统计
+    if (cause.wasEvicted()) {
+        statsCounter.recordEviction();
+    }
+    if (map.removalNotificationQueue != DISCARDING_QUEUE) {
+        RemovalNotification<K, V> notification = RemovalNotification.create(key, value, cause);
         map.removalNotificationQueue.offer(notification);
-	}
+    }
 }
 ```
 
@@ -525,7 +525,7 @@ usesWriteQueue最终的逻辑在expiresAfterWrite:
 
 ```java
 boolean expiresAfterWrite() {
-	return expireAfterWriteNanos > 0;
+    return expireAfterWriteNanos > 0;
 }
 ```
 
@@ -551,15 +551,15 @@ WriteQueue利用了双端队列实现了时间轴的概念，即**每次在队�
 ```java
 @Override
 public void notifyNewValue(@Nullable V newValue) {
-	if (newValue != null) {
-		// The pending load was clobbered by a manual write.
+    if (newValue != null) {
+        // The pending load was clobbered by a manual write.
         // Unblock all pending gets, and have them return the new value.
         set(newValue);
-	} else {
+    } else {
         // The pending load was removed. Delay notifications until loading completes.
         oldValue = unset();
-	}
-	// TODO(fry): could also cancel loading if we had a handle on its future
+    }
+    // TODO(fry): could also cancel loading if we had a handle on its future
 }
 ```
 
@@ -573,19 +573,19 @@ unset方法返回一个占位符对象，此对象用以说明此ValueReference�
 @GuardedBy("this")
 @Nullable
 ReferenceEntry<K, V> removeEntryFromChain(ReferenceEntry<K, V> first, ReferenceEntry<K, V> entry) {
-	int newCount = count;
-	ReferenceEntry<K, V> newFirst = entry.getNext();
-	for (ReferenceEntry<K, V> e = first; e != entry; e = e.getNext()) {
-		ReferenceEntry<K, V> next = copyEntry(e, newFirst);
+    int newCount = count;
+    ReferenceEntry<K, V> newFirst = entry.getNext();
+    for (ReferenceEntry<K, V> e = first; e != entry; e = e.getNext()) {
+        ReferenceEntry<K, V> next = copyEntry(e, newFirst);
         if (next != null) {
-			newFirst = next;
+            newFirst = next;
         } else {
-          	removeCollectedEntry(e);
-          	newCount--;
+            removeCollectedEntry(e);
+            newCount--;
         }
-	}
-	this.count = newCount;
-	return newFirst;
+    }
+    this.count = newCount;
+    return newFirst;
 }
 ```
 
@@ -618,19 +618,19 @@ expireEntries:
 ```java
 @GuardedBy("this")
 void expireEntries(long now) {
-  	//recencyQueue和accessQueue区分不清，暂且跳过
-	drainRecencyQueue();
-	ReferenceEntry<K, V> e;
-	while ((e = writeQueue.peek()) != null && map.isExpired(e, now)) {
-		if (!removeEntry(e, e.getHash(), RemovalCause.EXPIRED)) {
-			throw new AssertionError();
-		}
-	}
-	while ((e = accessQueue.peek()) != null && map.isExpired(e, now)) {
-		if (!removeEntry(e, e.getHash(), RemovalCause.EXPIRED)) {
-          	throw new AssertionError();
+    //recencyQueue和accessQueue区分不清，暂且跳过
+    drainRecencyQueue();
+    ReferenceEntry<K, V> e;
+    while ((e = writeQueue.peek()) != null && map.isExpired(e, now)) {
+        if (!removeEntry(e, e.getHash(), RemovalCause.EXPIRED)) {
+            throw new AssertionError();
         }
-	}
+    }
+    while ((e = accessQueue.peek()) != null && map.isExpired(e, now)) {
+        if (!removeEntry(e, e.getHash(), RemovalCause.EXPIRED)) {
+            throw new AssertionError();
+        }
+    }
 }
 ```
 
@@ -643,8 +643,8 @@ void expireEntries(long now) {
 ```java
 int newCount = this.count + 1;
 if (newCount > this.threshold) { // ensure capacity
-	expand();
-	newCount = this.count + 1;
+    expand();
+    newCount = this.count + 1;
 }
 ```
 
@@ -675,7 +675,7 @@ guava cache扩容仍然采用了ConcurrentHashMap的思想。**扩容是针对Se
 ```java
 @Override
 public V get(K key) throws ExecutionException {
-	return localCache.getOrLoad(key);
+    return localCache.getOrLoad(key);
 }
 ```
 
@@ -683,7 +683,7 @@ LocalCache.getOrLoad:
 
 ```java
 V getOrLoad(K key) throws ExecutionException {
-	return get(key, defaultLoader);
+    return get(key, defaultLoader);
 }
 ```
 
@@ -693,7 +693,7 @@ LocalCache.get:
 
 ```java
 V get(K key, CacheLoader<? super K, V> loader) throws ExecutionException {
-	int hash = hash(checkNotNull(key));
+    int hash = hash(checkNotNull(key));
     return segmentFor(hash).get(key, hash, loader);
 }
 ```
@@ -706,32 +706,32 @@ Segment.get简略版源码:
 V get(K key, int hash, CacheLoader<? super K, V> loader) throws ExecutionException {
   try {
     //快速判断
-	if (count != 0) { // read-volatile
-	  //遍历寻找
-	  ReferenceEntry<K, V> e = getEntry(key, hash);
-	  if (e != null) {
-		long now = map.ticker.read();
+    if (count != 0) { // read-volatile
+      //遍历寻找
+      ReferenceEntry<K, V> e = getEntry(key, hash);
+      if (e != null) {
+        long now = map.ticker.read();
         //判断Entry是否已经过期、被回收或是正在加载，如果是，返回null
-		V value = getLiveValue(e, now);
-		if (value != null) {
-		  recordRead(e, now);
-		  statsCounter.recordHits(1);
-		  return scheduleRefresh(e, key, hash, value, now, loader);
-		}
-		ValueReference<K, V> valueReference = e.getValueReference();
-		if (valueReference.isLoading()) {
+        V value = getLiveValue(e, now);
+        if (value != null) {
+          recordRead(e, now);
+          statsCounter.recordHits(1);
+          return scheduleRefresh(e, key, hash, value, now, loader);
+        }
+        ValueReference<K, V> valueReference = e.getValueReference();
+        if (valueReference.isLoading()) {
           //阻塞等待直到加载完成
-		  return waitForLoadingValue(e, key, valueReference);
-		}
-	  }
-	}
-	// at this point e is either null or expired;
+          return waitForLoadingValue(e, key, valueReference);
+        }
+      }
+    }
+    // at this point e is either null or expired;
     //加锁再次遍历或是加载
-	return lockedGetOrLoad(key, hash, loader);
+    return lockedGetOrLoad(key, hash, loader);
   } catch (ExecutionException ee) {
-	throw ee;
+    throw ee;
   } finally {
-	postReadCleanup();
+    postReadCleanup();
   }
 }
 ```
@@ -740,15 +740,15 @@ V get(K key, int hash, CacheLoader<? super K, V> loader) throws ExecutionExcepti
 
 ```java
 V scheduleRefresh(ReferenceEntry<K, V> entry,K key,int hash,V oldValue,long now,CacheLoader<? super K, V> loader) {
-	if (map.refreshes()
-		&& (now - entry.getWriteTime() > map.refreshNanos)
+    if (map.refreshes()
+        && (now - entry.getWriteTime() > map.refreshNanos)
         && !entry.getValueReference().isLoading()) {
-		V newValue = refresh(key, hash, loader, true);
+        V newValue = refresh(key, hash, loader, true);
         if (newValue != null) {
-			return newValue;
-		}
-	}
-	return oldValue;
+            return newValue;
+        }
+    }
+    return oldValue;
 }
 ```
 

@@ -11,18 +11,18 @@ HttpServletBean.init:
 ```java
 @Override
 public final void init() throws ServletException {
-	// Set bean properties from init parameters.
-	PropertyValues pvs = new ServletConfigPropertyValues(getServletConfig(), this.requiredProperties);
-  	//包装DispatcherServlet，准备放入容器
-	BeanWrapper bw = PropertyAccessorFactory.forBeanPropertyAccess(this);
-  	//用以加载spring-mvc配置文件
-	ResourceLoader resourceLoader = new ServletContextResourceLoader(getServletContext());
-	bw.registerCustomEditor(Resource.class, new ResourceEditor(resourceLoader, getEnvironment()));
-  	//没有子类实现此方法
-	initBeanWrapper(bw);
-	bw.setPropertyValues(pvs, true);
-	// Let subclasses do whatever initialization they like.
-	initServletBean();
+    // Set bean properties from init parameters.
+    PropertyValues pvs = new ServletConfigPropertyValues(getServletConfig(), this.requiredProperties);
+    //包装DispatcherServlet，准备放入容器
+    BeanWrapper bw = PropertyAccessorFactory.forBeanPropertyAccess(this);
+    //用以加载spring-mvc配置文件
+    ResourceLoader resourceLoader = new ServletContextResourceLoader(getServletContext());
+    bw.registerCustomEditor(Resource.class, new ResourceEditor(resourceLoader, getEnvironment()));
+    //没有子类实现此方法
+    initBeanWrapper(bw);
+    bw.setPropertyValues(pvs, true);
+    // Let subclasses do whatever initialization they like.
+    initServletBean();
 }
 ```
 
@@ -35,9 +35,9 @@ FrameworkServlet.initServletBean简略版源码:
 ```java
 @Override
 protected final void initServletBean() {
-	this.webApplicationContext = initWebApplicationContext();
-  	//空实现，且没有子类覆盖
-	initFrameworkServlet()
+    this.webApplicationContext = initWebApplicationContext();
+    //空实现，且没有子类覆盖
+    initFrameworkServlet()
 }
 ```
 
@@ -45,38 +45,38 @@ FrameworkServlet.initWebApplicationContext:
 
 ```java
 protected WebApplicationContext initWebApplicationContext() {
-  	//根容器查找
-	WebApplicationContext rootContext =
-			WebApplicationContextUtils.getWebApplicationContext(getServletContext());
-	WebApplicationContext wac = null;
-	if (this.webApplicationContext != null) {
-      	//有可能DispatcherServlet被作为Spring bean初始化，且webApplicationContext已被注入进来
-		wac = this.webApplicationContext;
-		if (wac instanceof ConfigurableWebApplicationContext) {
-			ConfigurableWebApplicationContext cwac = (ConfigurableWebApplicationContext) wac;
-			if (!cwac.isActive()) {
-				if (cwac.getParent() == null) {
-					cwac.setParent(rootContext);
-				}
-				configureAndRefreshWebApplicationContext(cwac);
-			}
-		}
-	}
-	if (wac == null) {
-      	//是否已经存在于ServletContext中
-		wac = findWebApplicationContext();
-	}
-	if (wac == null) {
-		wac = createWebApplicationContext(rootContext);
-	}
-	if (!this.refreshEventReceived) {
-		onRefresh(wac);
-	}
-	if (this.publishContext) {
-		String attrName = getServletContextAttributeName();
-		getServletContext().setAttribute(attrName, wac);
-	}
-	return wac;
+    //根容器查找
+    WebApplicationContext rootContext =
+            WebApplicationContextUtils.getWebApplicationContext(getServletContext());
+    WebApplicationContext wac = null;
+    if (this.webApplicationContext != null) {
+        //有可能DispatcherServlet被作为Spring bean初始化，且webApplicationContext已被注入进来
+        wac = this.webApplicationContext;
+        if (wac instanceof ConfigurableWebApplicationContext) {
+            ConfigurableWebApplicationContext cwac = (ConfigurableWebApplicationContext) wac;
+            if (!cwac.isActive()) {
+                if (cwac.getParent() == null) {
+                    cwac.setParent(rootContext);
+                }
+                configureAndRefreshWebApplicationContext(cwac);
+            }
+        }
+    }
+    if (wac == null) {
+        //是否已经存在于ServletContext中
+        wac = findWebApplicationContext();
+    }
+    if (wac == null) {
+        wac = createWebApplicationContext(rootContext);
+    }
+    if (!this.refreshEventReceived) {
+        onRefresh(wac);
+    }
+    if (this.publishContext) {
+        String attrName = getServletContextAttributeName();
+        getServletContext().setAttribute(attrName, wac);
+    }
+    return wac;
 }
 ```
 
@@ -90,7 +90,7 @@ Spring容器(根容器)以下列形式进行配置(web.xml):
 
 ```xml
 <listener>
-	<listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+    <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
 </listener>
 ```
 
@@ -103,7 +103,7 @@ WebApplicationContextUtils.getWebApplicationContext:
 ```java
 String ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE = WebApplicationContext.class.getName() + ".ROOT";
 public static WebApplicationContext getWebApplicationContext(ServletContext sc) {
-	return getWebApplicationContext(sc, WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE);
+    return getWebApplicationContext(sc, WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE);
 }
 ```
 
@@ -111,11 +111,11 @@ public static WebApplicationContext getWebApplicationContext(ServletContext sc) 
 
 ```java
 public static WebApplicationContext getWebApplicationContext(ServletContext sc, String attrName) {
-	Object attr = sc.getAttribute(attrName);
-	if (attr == null) {
-		return null;
-	}
-	return (WebApplicationContext) attr;
+    Object attr = sc.getAttribute(attrName);
+    if (attr == null) {
+        return null;
+    }
+    return (WebApplicationContext) attr;
 }
 ```
 
@@ -129,17 +129,17 @@ FrameworkServlet.createWebApplicationContext:
 
 ```java
 protected WebApplicationContext createWebApplicationContext(ApplicationContext parent) {
-	Class<?> contextClass = getContextClass();
-	if (!ConfigurableWebApplicationContext.class.isAssignableFrom(contextClass)) {
-		throw new ApplicationContextException();
-	}
-	ConfigurableWebApplicationContext wac =
-			(ConfigurableWebApplicationContext) BeanUtils.instantiateClass(contextClass);
-	wac.setEnvironment(getEnvironment());
-	wac.setParent(parent);
-	wac.setConfigLocation(getContextConfigLocation());
-	configureAndRefreshWebApplicationContext(wac);
-	return wac;
+    Class<?> contextClass = getContextClass();
+    if (!ConfigurableWebApplicationContext.class.isAssignableFrom(contextClass)) {
+        throw new ApplicationContextException();
+    }
+    ConfigurableWebApplicationContext wac =
+            (ConfigurableWebApplicationContext) BeanUtils.instantiateClass(contextClass);
+    wac.setEnvironment(getEnvironment());
+    wac.setParent(parent);
+    wac.setConfigLocation(getContextConfigLocation());
+    configureAndRefreshWebApplicationContext(wac);
+    return wac;
 }
 ```
 
@@ -147,18 +147,18 @@ protected WebApplicationContext createWebApplicationContext(ApplicationContext p
 
 ```xml
 <servlet>
-	<servlet-name>SpringMVC</servlet-name>
-	<servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
-	<!-- 配置文件位置 -->
-	<init-param>
-		<param-name>contextConfigLocation</param-name>
-		<param-value>classpath:spring-servlet.xml</param-value>
-	</init-param>
-  	<!-- 容器类型 -->
-	<init-param>
-		<param-name>contextClass</param-name>
-		<param-value>java.lang.Object</param-value>
-	</init-param>
+    <servlet-name>SpringMVC</servlet-name>
+    <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+    <!-- 配置文件位置 -->
+    <init-param>
+        <param-name>contextConfigLocation</param-name>
+        <param-value>classpath:spring-servlet.xml</param-value>
+    </init-param>
+    <!-- 容器类型 -->
+    <init-param>
+        <param-name>contextClass</param-name>
+        <param-value>java.lang.Object</param-value>
+    </init-param>
 </servlet>
 ```
 
@@ -166,8 +166,8 @@ configureAndRefreshWebApplicationContext核心源码:
 
 ```java
 protected void configureAndRefreshWebApplicationContext(ConfigurableWebApplicationContext wac) {
-	applyInitializers(wac);
-	wac.refresh();
+    applyInitializers(wac);
+    wac.refresh();
 }
 ```
 
@@ -177,8 +177,8 @@ ApplicationContextInitializer允许我们在Spring(mvc)容器初始化之前干�
 
 ```xml
 <init-param>
-	<param-name>contextInitializerClasses</param-name>
-	<param-value>坏事儿</param-value>
+    <param-name>contextInitializerClasses</param-name>
+    <param-value>坏事儿</param-value>
 </init-param>
 ```
 
@@ -197,7 +197,7 @@ applyInitializers方法正是要触发这些坏事儿。类图:
 <mvc:default-servlet-handler/>
 <!-- 配置视图 -->
 <bean class="org.springframework.web.servlet.view.UrlBasedViewResolver">
-	<!-- viewClass属性必不可少 -->
+    <!-- viewClass属性必不可少 -->
     <property name="viewClass" value="org.springframework.web.servlet.view.JstlView"></property>
     <property name="prefix" value="/WEB-INF/"></property>
     <property name="suffix" value=".jsp"></property>
@@ -219,11 +219,11 @@ mvc命名空间的解析器为MvcNamespaceHandler，部分源码:
 ```java
 @Override
 public void init() {
-	registerBeanDefinitionParser("annotation-driven", new AnnotationDrivenBeanDefinitionParser());
-	registerBeanDefinitionParser("default-servlet-handler", 
+    registerBeanDefinitionParser("annotation-driven", new AnnotationDrivenBeanDefinitionParser());
+    registerBeanDefinitionParser("default-servlet-handler", 
                                  new DefaultServletHandlerBeanDefinitionParser());
-	registerBeanDefinitionParser("interceptors", new IanterceptorsBeanDefinitionParser());
-	registerBeanDefinitionParser("view-resolvers", new ViewResolversBeanDefinitionParser());
+    registerBeanDefinitionParser("interceptors", new IanterceptorsBeanDefinitionParser());
+    registerBeanDefinitionParser("view-resolvers", new ViewResolversBeanDefinitionParser());
 }
 ```
 
@@ -261,7 +261,7 @@ InterceptorsBeanDefinitionParser.parse方法负责**将每一项`mvc:interceptor
 
   ```xml
   <bean class="org.springframework.web.servlet.view.UrlBasedViewResolver">
-  	<!-- viewClass属性必不可少 -->
+    <!-- viewClass属性必不可少 -->
       <property name="viewClass" value="org.springframework.web.servlet.view.JstlView"></property>
       <property name="prefix" value="/WEB-INF/"></property>
       <property name="suffix" value=".jsp"></property>
@@ -272,7 +272,7 @@ InterceptorsBeanDefinitionParser.parse方法负责**将每一项`mvc:interceptor
 
   ```xml
   <mvc:view-resolvers>
-  	<mvc:jsp view-class="" />
+    <mvc:jsp view-class="" />
   </mvc:view-resolvers>
   ```
 
@@ -287,13 +287,13 @@ AbstractRefreshableWebApplicationContext.postProcessBeanFactory:
 ```java
 @Override
 protected void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) {
-	beanFactory.addBeanPostProcessor(
-      	new ServletContextAwareProcessor(this.servletContext, this.servletConfig));
-	beanFactory.ignoreDependencyInterface(ServletContextAware.class);
-	beanFactory.ignoreDependencyInterface(ServletConfigAware.class);
-	WebApplicationContextUtils.registerWebApplicationScopes(beanFactory, this.servletContext);
-	WebApplicationContextUtils.registerEnvironmentBeans(beanFactory, 
-    	this.servletContext, this.servletConfig);
+    beanFactory.addBeanPostProcessor(
+        new ServletContextAwareProcessor(this.servletContext, this.servletConfig));
+    beanFactory.ignoreDependencyInterface(ServletContextAware.class);
+    beanFactory.ignoreDependencyInterface(ServletConfigAware.class);
+    WebApplicationContextUtils.registerWebApplicationScopes(beanFactory, this.servletContext);
+    WebApplicationContextUtils.registerEnvironmentBeans(beanFactory, 
+        this.servletContext, this.servletConfig);
 }
 ```
 
@@ -309,15 +309,15 @@ registerEnvironmentBeans用以将servletContext、servletConfig以及各种启�
 
 ```java
 protected void initStrategies(ApplicationContext context) {
-	initMultipartResolver(context);
-	initLocaleResolver(context);
-	initThemeResolver(context);
-	initHandlerMappings(context);
-	initHandlerAdapters(context);
-	initHandlerExceptionResolvers(context);
-	initRequestToViewNameTranslator(context);
-	initViewResolvers(context);
-	initFlashMapManager(context);
+    initMultipartResolver(context);
+    initLocaleResolver(context);
+    initThemeResolver(context);
+    initHandlerMappings(context);
+    initHandlerAdapters(context);
+    initHandlerExceptionResolvers(context);
+    initRequestToViewNameTranslator(context);
+    initViewResolvers(context);
+    initFlashMapManager(context);
 }
 ```
 
@@ -329,12 +329,12 @@ initMultipartResolver核心源码:
 
 ```java
 private void initMultipartResolver(ApplicationContext context) {
-	try {
-		this.multipartResolver = context.getBean(MULTIPART_RESOLVER_BEAN_NAME, MultipartResolver.class);
-	} catch (NoSuchBeanDefinitionException ex) {
-		// Default is no multipart resolver.
-		this.multipartResolver = null;
-	}
+    try {
+        this.multipartResolver = context.getBean(MULTIPART_RESOLVER_BEAN_NAME, MultipartResolver.class);
+    } catch (NoSuchBeanDefinitionException ex) {
+        // Default is no multipart resolver.
+        this.multipartResolver = null;
+    }
 }
 ```
 
@@ -366,10 +366,10 @@ initHandlerMappings方法用于确保容器中**至少含有一个HandlerMapping
 
 ```java
 if (this.handlerMappings == null) {
-	this.handlerMappings = getDefaultStrategies(context, HandlerMapping.class);
-	if (logger.isDebugEnabled()) {
-		logger.debug("No HandlerMappings found in servlet '" + getServletName() + "': using default");
-	}
+    this.handlerMappings = getDefaultStrategies(context, HandlerMapping.class);
+    if (logger.isDebugEnabled()) {
+        logger.debug("No HandlerMappings found in servlet '" + getServletName() + "': using default");
+    }
 }
 ```
 
@@ -421,22 +421,22 @@ initFlashMapManager方法会向容器注册SessionFlashMapManager对象，类图
 
 ```java
 protected void initHandlerMethods() {
-  	//获取容器中所有的bean
-	String[] beanNames = (this.detectHandlerMethodsInAncestorContexts ?
-			BeanFactoryUtils.beanNamesForTypeIncludingAncestors(getApplicationContext(), Object.class) 			   :getApplicationContext().getBeanNamesForType(Object.class));
-	for (String beanName : beanNames) {
-		if (!beanName.startsWith(SCOPED_TARGET_NAME_PREFIX)) {
-			Class<?> beanType = null;
-			beanType = getApplicationContext().getType(beanName);
-        	 //isHandler方法的原理:
+    //获取容器中所有的bean
+    String[] beanNames = (this.detectHandlerMethodsInAncestorContexts ?
+            BeanFactoryUtils.beanNamesForTypeIncludingAncestors(getApplicationContext(), Object.class) 			   :getApplicationContext().getBeanNamesForType(Object.class));
+    for (String beanName : beanNames) {
+        if (!beanName.startsWith(SCOPED_TARGET_NAME_PREFIX)) {
+            Class<?> beanType = null;
+            beanType = getApplicationContext().getType(beanName);
+             //isHandler方法的原理:
              //判断类上有没有@Controller注解或者是@RequestMapping注解
-			if (beanType != null && isHandler(beanType)) {
-				detectHandlerMethods(beanName);
-			}
-		}
-	}
-  	//空实现
-	handlerMethodsInitialized(getHandlerMethods());
+            if (beanType != null && isHandler(beanType)) {
+                detectHandlerMethods(beanName);
+            }
+        }
+    }
+    //空实现
+    handlerMethodsInitialized(getHandlerMethods());
 }
 ```
 
@@ -454,23 +454,23 @@ detectHandlerMethods方法将反射遍历类中所有的public方法，如果方
 
 ```java
 public void register(T mapping, Object handler, Method method) {
-  	//包装bean和方法
-	HandlerMethod handlerMethod = createHandlerMethod(handler, method);
-	this.mappingLookup.put(mapping, handlerMethod);
-	List<String> directUrls = getDirectUrls(mapping);
-	for (String url : directUrls) {
-		this.urlLookup.add(url, mapping);
-	}
-	String name = null;
-	if (getNamingStrategy() != null) {
-		name = getNamingStrategy().getName(handlerMethod, mapping);
-		addMappingName(name, handlerMethod);
-	}
-	CorsConfiguration corsConfig = initCorsConfiguration(handler, method, mapping);
-	if (corsConfig != null) {
-		this.corsLookup.put(handlerMethod, corsConfig);
-	}
-	this.registry.put(mapping, new MappingRegistration<T>(mapping, handlerMethod, directUrls, name));
+    //包装bean和方法
+    HandlerMethod handlerMethod = createHandlerMethod(handler, method);
+    this.mappingLookup.put(mapping, handlerMethod);
+    List<String> directUrls = getDirectUrls(mapping);
+    for (String url : directUrls) {
+        this.urlLookup.add(url, mapping);
+    }
+    String name = null;
+    if (getNamingStrategy() != null) {
+        name = getNamingStrategy().getName(handlerMethod, mapping);
+        addMappingName(name, handlerMethod);
+    }
+    CorsConfiguration corsConfig = initCorsConfiguration(handler, method, mapping);
+    if (corsConfig != null) {
+        this.corsLookup.put(handlerMethod, corsConfig);
+    }
+    this.registry.put(mapping, new MappingRegistration<T>(mapping, handlerMethod, directUrls, name));
 }
 ```
 
@@ -478,18 +478,18 @@ mapping其实是一个RequestMappingInfo对象，可以将其看做是**@Request
 
 ```java
 protected RequestMappingInfo createRequestMappingInfo(
-		RequestMapping requestMapping, RequestCondition<?> customCondition) {
-	return RequestMappingInfo
-			.paths(resolveEmbeddedValuesInPatterns(requestMapping.path()))
-			.methods(requestMapping.method())
-			.params(requestMapping.params())
-			.headers(requestMapping.headers())
-			.consumes(requestMapping.consumes())
-			.produces(requestMapping.produces())
-			.mappingName(requestMapping.name())
-			.customCondition(customCondition)
-			.options(this.config)
-			.build();
+        RequestMapping requestMapping, RequestCondition<?> customCondition) {
+    return RequestMappingInfo
+            .paths(resolveEmbeddedValuesInPatterns(requestMapping.path()))
+            .methods(requestMapping.method())
+            .params(requestMapping.params())
+            .headers(requestMapping.headers())
+            .consumes(requestMapping.consumes())
+            .produces(requestMapping.produces())
+            .mappingName(requestMapping.name())
+            .customCondition(customCondition)
+            .options(this.config)
+            .build();
 }
 ```
 
@@ -511,7 +511,7 @@ spring-mvc自4.2开启加入了跨域请求Cors的支持，主要有两种配置
 
   ```xml
   <mvc:cors>
-  	<mvc:mapping path=""/>
+    <mvc:mapping path=""/>
   </mvc:cors>
   ```
 
@@ -530,7 +530,7 @@ AbstractHandlerMapping.initApplicationContext:
 ```java
 @Override
 protected void initApplicationContext() throws BeansException {
-	detectMappedInterceptors(this.adaptedInterceptors);
+    detectMappedInterceptors(this.adaptedInterceptors);
 }
 ```
 
@@ -549,23 +549,23 @@ protected void initApplicationContext() throws BeansException {
 ```java
 @Override
 public void afterPropertiesSet() {
-	// Do this first, it may add ResponseBody advice beans
-	initControllerAdviceCache();
-	if (this.argumentResolvers == null) {
-		List<HandlerMethodArgumentResolver> resolvers = getDefaultArgumentResolvers();
-		this.argumentResolvers = new HandlerMethodArgumentResolverComposite()
-			.addResolvers(resolvers);
-	}
-	if (this.initBinderArgumentResolvers == null) {
-		List<HandlerMethodArgumentResolver> resolvers = getDefaultInitBinderArgumentResolvers();
-		this.initBinderArgumentResolvers = new HandlerMethodArgumentResolverComposite()
-			.addResolvers(resolvers);
-	}
-	if (this.returnValueHandlers == null) {
-		List<HandlerMethodReturnValueHandler> handlers = getDefaultReturnValueHandlers();
-		this.returnValueHandlers = new HandlerMethodReturnValueHandlerComposite()
-			.addHandlers(handlers);
-	}
+    // Do this first, it may add ResponseBody advice beans
+    initControllerAdviceCache();
+    if (this.argumentResolvers == null) {
+        List<HandlerMethodArgumentResolver> resolvers = getDefaultArgumentResolvers();
+        this.argumentResolvers = new HandlerMethodArgumentResolverComposite()
+            .addResolvers(resolvers);
+    }
+    if (this.initBinderArgumentResolvers == null) {
+        List<HandlerMethodArgumentResolver> resolvers = getDefaultInitBinderArgumentResolvers();
+        this.initBinderArgumentResolvers = new HandlerMethodArgumentResolverComposite()
+            .addResolvers(resolvers);
+    }
+    if (this.returnValueHandlers == null) {
+        List<HandlerMethodReturnValueHandler> handlers = getDefaultReturnValueHandlers();
+        this.returnValueHandlers = new HandlerMethodReturnValueHandlerComposite()
+            .addHandlers(handlers);
+    }
 }
 ```
 
@@ -606,12 +606,12 @@ FrameworkServlet覆盖了service方法:
 ```java
 @Override
 protected void service(HttpServletRequest request, HttpServletResponse response) {
-	HttpMethod httpMethod = HttpMethod.resolve(request.getMethod());
-	if (HttpMethod.PATCH == httpMethod || httpMethod == null) {
-		processRequest(request, response);
-	} else {
-		super.service(request, response);
-	}
+    HttpMethod httpMethod = HttpMethod.resolve(request.getMethod());
+    if (HttpMethod.PATCH == httpMethod || httpMethod == null) {
+        processRequest(request, response);
+    } else {
+        super.service(request, response);
+    }
 }
 ```
 
@@ -634,12 +634,12 @@ DispatcherServlet.doDispatch简略版源码:
 
 ```java
 protected void doDispatch(HttpServletRequest request, HttpServletResponse response) {
-	HandlerExecutionChain mappedHandler = getHandler(processedRequest);
-	HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler());
-	mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
-	applyDefaultViewName(processedRequest, mv);
-	mappedHandler.applyPostHandle(processedRequest, response, mv);
-	processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException);
+    HandlerExecutionChain mappedHandler = getHandler(processedRequest);
+    HandlerAdapter ha = getHandlerAdapter(mappedHandler.getHandler());
+    mv = ha.handle(processedRequest, response, mappedHandler.getHandler());
+    applyDefaultViewName(processedRequest, mv);
+    mappedHandler.applyPostHandle(processedRequest, response, mv);
+    processDispatchResult(processedRequest, response, mappedHandler, mv, dispatchException);
 }
 ```
 
@@ -649,13 +649,13 @@ protected void doDispatch(HttpServletRequest request, HttpServletResponse respon
 
 ```java
 protected HandlerExecutionChain getHandler(HttpServletRequest request) {
-	for (HandlerMapping hm : this.handlerMappings) {
-		HandlerExecutionChain handler = hm.getHandler(request);
-		if (handler != null) {
-			return handler;
-		}
-	}
-	return null;
+    for (HandlerMapping hm : this.handlerMappings) {
+        HandlerExecutionChain handler = hm.getHandler(request);
+        if (handler != null) {
+            return handler;
+        }
+    }
+    return null;
 }
 ```
 
@@ -666,17 +666,17 @@ AbstractHandlerMapping.getHandler:
 ```java
 @Override
 public final HandlerExecutionChain getHandler(HttpServletRequest request) throws Exception {
-	Object handler = getHandlerInternal(request);
-	HandlerExecutionChain executionChain = getHandlerExecutionChain(handler, request);
-  	//判断请求头中是否有ORIGIN字段
-	if (CorsUtils.isCorsRequest(request)) {
-		CorsConfiguration globalConfig = this.corsConfigSource.getCorsConfiguration(request);
-		CorsConfiguration handlerConfig = getCorsConfiguration(handler, request);
-		CorsConfiguration config = (globalConfig != null ? 
-			globalConfig.combine(handlerConfig) : handlerConfig);
-		executionChain = getCorsHandlerExecutionChain(request, executionChain, config);
-	}
-	return executionChain;
+    Object handler = getHandlerInternal(request);
+    HandlerExecutionChain executionChain = getHandlerExecutionChain(handler, request);
+    //判断请求头中是否有ORIGIN字段
+    if (CorsUtils.isCorsRequest(request)) {
+        CorsConfiguration globalConfig = this.corsConfigSource.getCorsConfiguration(request);
+        CorsConfiguration handlerConfig = getCorsConfiguration(handler, request);
+        CorsConfiguration config = (globalConfig != null ? 
+            globalConfig.combine(handlerConfig) : handlerConfig);
+        executionChain = getCorsHandlerExecutionChain(request, executionChain, config);
+    }
+    return executionChain;
 }
 ```
 
@@ -692,11 +692,11 @@ DispatcherServlet.getHandlerAdapter:
 
 ```java
 protected HandlerAdapter getHandlerAdapter(Object handler) {
-	for (HandlerAdapter ha : this.handlerAdapters) {
-		if (ha.supports(handler)) {
-			return ha;
-		}
-	}
+    for (HandlerAdapter ha : this.handlerAdapters) {
+        if (ha.supports(handler)) {
+            return ha;
+        }
+    }
 }
 ```
 
@@ -709,33 +709,33 @@ RequestMappingHandlerAdapter.handleInternal:
 ```java
 @Override
 protected ModelAndView handleInternal(HttpServletRequest request,
-		HttpServletResponse response, HandlerMethod handlerMethod){
-	ModelAndView mav;
-	// Execute invokeHandlerMethod in synchronized block if required.
-	if (this.synchronizeOnSession) {
-		HttpSession session = request.getSession(false);
-		if (session != null) {
-			Object mutex = WebUtils.getSessionMutex(session);
-			synchronized (mutex) {
-				mav = invokeHandlerMethod(request, response, handlerMethod);
-			}
-		} else {
-			// No HttpSession available -> no mutex necessary
-			mav = invokeHandlerMethod(request, response, handlerMethod);
-		}
-	} else {
-		// No synchronization on session demanded at all...
-		mav = invokeHandlerMethod(request, response, handlerMethod);
-	}
-	if (!response.containsHeader(HEADER_CACHE_CONTROL)) {
-		if (getSessionAttributesHandler(handlerMethod).hasSessionAttributes()) {
-			applyCacheSeconds(response, this.cacheSecondsForSessionAttributeHandlers);
-		}
-		else {
-			prepareResponse(response);
-		}
-	}
-	return mav;
+        HttpServletResponse response, HandlerMethod handlerMethod){
+    ModelAndView mav;
+    // Execute invokeHandlerMethod in synchronized block if required.
+    if (this.synchronizeOnSession) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            Object mutex = WebUtils.getSessionMutex(session);
+            synchronized (mutex) {
+                mav = invokeHandlerMethod(request, response, handlerMethod);
+            }
+        } else {
+            // No HttpSession available -> no mutex necessary
+            mav = invokeHandlerMethod(request, response, handlerMethod);
+        }
+    } else {
+        // No synchronization on session demanded at all...
+        mav = invokeHandlerMethod(request, response, handlerMethod);
+    }
+    if (!response.containsHeader(HEADER_CACHE_CONTROL)) {
+        if (getSessionAttributesHandler(handlerMethod).hasSessionAttributes()) {
+            applyCacheSeconds(response, this.cacheSecondsForSessionAttributeHandlers);
+        }
+        else {
+            prepareResponse(response);
+        }
+    }
+    return mav;
 }
 ```
 
@@ -760,13 +760,13 @@ supportsParameter方法决定了一个解析器可以解析的参数类型，该
 ```java
 @Override
 protected Object resolveName(String name, MethodParameter parameter, NativeWebRequest request) {
-	if (arg == null) {
-		String[] paramValues = request.getParameterValues(name);
-		if (paramValues != null) {
-			arg = (paramValues.length == 1 ? paramValues[0] : paramValues);
-		}
-	}
-	return arg;
+    if (arg == null) {
+        String[] paramValues = request.getParameterValues(name);
+        if (paramValues != null) {
+            arg = (paramValues.length == 1 ? paramValues[0] : paramValues);
+        }
+    }
+    return arg;
 }
 ```
 
@@ -781,7 +781,7 @@ supportsParameter方法很简单:
 ```java
 @Override
 public boolean supportsParameter(MethodParameter parameter) {
-	return Model.class.isAssignableFrom(parameter.getParameterType());
+    return Model.class.isAssignableFrom(parameter.getParameterType());
 }
 ```
 
@@ -792,8 +792,8 @@ resolveArgument：
 ```java
 @Override
 public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
-	NativeWebRequest webRequest, WebDataBinderFactory binderFactory) throws Exception {
-	return mavContainer.getModel();
+    NativeWebRequest webRequest, WebDataBinderFactory binderFactory) throws Exception {
+    return mavContainer.getModel();
 }
 ```
 
@@ -814,8 +814,8 @@ supportsReturnType方法:
 ```java
 @Override
 public boolean supportsReturnType(MethodParameter returnType) {
-	Class<?> paramType = returnType.getParameterType();
-	return (void.class == paramType || CharSequence.class.isAssignableFrom(paramType));
+    Class<?> paramType = returnType.getParameterType();
+    return (void.class == paramType || CharSequence.class.isAssignableFrom(paramType));
 }
 ```
 
@@ -824,15 +824,15 @@ handleReturnValue:
 ```java
 @Override
 public void handleReturnValue(Object returnValue, MethodParameter returnType,
-		ModelAndViewContainer mavContainer, NativeWebRequest webRequest) {
-	if (returnValue instanceof CharSequence) {
-		String viewName = returnValue.toString();
-		mavContainer.setViewName(viewName);
-      	 // 判断的依据: 是否以redirect:开头
-		if (isRedirectViewName(viewName)) {
-			mavContainer.setRedirectModelScenario(true);
-		}
-	}
+        ModelAndViewContainer mavContainer, NativeWebRequest webRequest) {
+    if (returnValue instanceof CharSequence) {
+        String viewName = returnValue.toString();
+        mavContainer.setViewName(viewName);
+         // 判断的依据: 是否以redirect:开头
+        if (isRedirectViewName(viewName)) {
+            mavContainer.setRedirectModelScenario(true);
+        }
+    }
 }
 ```
 
@@ -844,25 +844,25 @@ public void handleReturnValue(Object returnValue, MethodParameter returnType,
 
 ```java
 private void processDispatchResult(HttpServletRequest request, HttpServletResponse response,
-		HandlerExecutionChain mappedHandler, ModelAndView mv, Exception exception) {
-	boolean errorView = false;
-	if (exception != null) {
-      	 //一般不会到这个分支
-		if (exception instanceof ModelAndViewDefiningException) {
-			mv = ((ModelAndViewDefiningException) exception).getModelAndView();
-		} else {
-			Object handler = (mappedHandler != null ? mappedHandler.getHandler() : null);
-			mv = processHandlerException(request, response, handler, exception);
-			errorView = (mv != null);
-		}
-	}
-	// Did the handler return a view to render?
-	if (mv != null && !mv.wasCleared()) {
-		render(mv, request, response);
-		if (errorView) {
-			WebUtils.clearErrorRequestAttributes(request);
-		}
-	}
+        HandlerExecutionChain mappedHandler, ModelAndView mv, Exception exception) {
+    boolean errorView = false;
+    if (exception != null) {
+         //一般不会到这个分支
+        if (exception instanceof ModelAndViewDefiningException) {
+            mv = ((ModelAndViewDefiningException) exception).getModelAndView();
+        } else {
+            Object handler = (mappedHandler != null ? mappedHandler.getHandler() : null);
+            mv = processHandlerException(request, response, handler, exception);
+            errorView = (mv != null);
+        }
+    }
+    // Did the handler return a view to render?
+    if (mv != null && !mv.wasCleared()) {
+        render(mv, request, response);
+        if (errorView) {
+            WebUtils.clearErrorRequestAttributes(request);
+        }
+    }
 }
 ```
 
@@ -874,7 +874,7 @@ private void processDispatchResult(HttpServletRequest request, HttpServletRespon
 
 ```xml
 <bean class="org.springframework.web.servlet.handler.SimpleMappingExceptionResolver">
-	<property name="defaultErrorView" value="error"></property>
+    <property name="defaultErrorView" value="error"></property>
 </bean>
 ```
 
@@ -901,21 +901,21 @@ DispatcherServlet.render简略版源码:
 
 ```java
 protected void render(ModelAndView mv, HttpServletRequest request, HttpServletResponse response) {
-	Locale locale = this.localeResolver.resolveLocale(request);
-	response.setLocale(locale);
-	View view;
-  	//判断依据: 是否是String类型
-	if (mv.isReference()) {
-		// We need to resolve the view name.
-		view = resolveViewName(mv.getViewName(), mv.getModelInternal(), locale, request);
-	} else {
-		// No need to lookup: the ModelAndView object contains the actual View object.
-		view = mv.getView();
-	}
-	if (mv.getStatus() != null) {
-		response.setStatus(mv.getStatus().value());
-	}
-	view.render(mv.getModelInternal(), request, response);
+    Locale locale = this.localeResolver.resolveLocale(request);
+    response.setLocale(locale);
+    View view;
+    //判断依据: 是否是String类型
+    if (mv.isReference()) {
+        // We need to resolve the view name.
+        view = resolveViewName(mv.getViewName(), mv.getModelInternal(), locale, request);
+    } else {
+        // No need to lookup: the ModelAndView object contains the actual View object.
+        view = mv.getView();
+    }
+    if (mv.getStatus() != null) {
+        response.setStatus(mv.getStatus().value());
+    }
+    view.render(mv.getModelInternal(), request, response);
 }
 ```
 
@@ -940,21 +940,21 @@ resolveViewName方法的源码不再贴出，其实只做了一件事: 用反射
 ```java
 @Override
 protected void renderMergedOutputModel(
-		Map<String, Object> model, HttpServletRequest request, HttpServletResponse response) {
-  	// 将Model中的属性设置的request中
-	exposeModelAsRequestAttributes(model, request);
-	// 获取资源(jsp)路径
-	String dispatcherPath = prepareForRendering(request, response);
-	// Obtain a RequestDispatcher for the target resource (typically a JSP).
-	RequestDispatcher rd = getRequestDispatcher(request, dispatcherPath);
-	// If already included or response already committed, perform include, else forward.
-	if (useInclude(request, response)) {
-		response.setContentType(getContentType());
-		rd.include(request, response);
-	} else {
-		// Note: The forwarded resource is supposed to determine the content type itself.
-		rd.forward(request, response);
-	}
+        Map<String, Object> model, HttpServletRequest request, HttpServletResponse response) {
+    // 将Model中的属性设置的request中
+    exposeModelAsRequestAttributes(model, request);
+    // 获取资源(jsp)路径
+    String dispatcherPath = prepareForRendering(request, response);
+    // Obtain a RequestDispatcher for the target resource (typically a JSP).
+    RequestDispatcher rd = getRequestDispatcher(request, dispatcherPath);
+    // If already included or response already committed, perform include, else forward.
+    if (useInclude(request, response)) {
+        response.setContentType(getContentType());
+        rd.include(request, response);
+    } else {
+        // Note: The forwarded resource is supposed to determine the content type itself.
+        rd.forward(request, response);
+    }
 }
 ```
 

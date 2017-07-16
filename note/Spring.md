@@ -5,7 +5,7 @@
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>    
 <beans>    
-  	<bean class="base.SimpleBean"></bean>
+    <bean class="base.SimpleBean"></bean>
 </beans>
 ```
 
@@ -13,10 +13,10 @@
 
 ```java
 public static void main(String[] args) {
-	ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("config.xml");
-	SimpleBean bean = context.getBean(SimpleBean.class);
-	bean.send();
-	context.close();
+    ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("config.xml");
+    SimpleBean bean = context.getBean(SimpleBean.class);
+    bean.send();
+    context.close();
 }
 ```
 
@@ -24,9 +24,9 @@ SimpleBean:
 
 ```java
 public class SimpleBean {
-	public void send() {
-		System.out.println("I am send method from SimpleBean!");
-	}
+    public void send() {
+        System.out.println("I am send method from SimpleBean!");
+    }
 }
 ```
 
@@ -42,13 +42,13 @@ ResourceLoader代表了**加载资源的一种方式，正是策略模式的实�
 
 ```java
 public ClassPathXmlApplicationContext(String[] configLocations, boolean refresh, ApplicationContext 	         parent) {
-  	//null
-	super(parent);
-	setConfigLocations(configLocations);
-  	//默认true
-	if (refresh) {
-		refresh();
-	}
+    //null
+    super(parent);
+    setConfigLocations(configLocations);
+    //默认true
+    if (refresh) {
+        refresh();
+    }
 }
 ```
 
@@ -58,11 +58,11 @@ public ClassPathXmlApplicationContext(String[] configLocations, boolean refresh,
 
 ```java
 public AbstractApplicationContext(ApplicationContext parent) {
-	this();
-	setParent(parent);
+    this();
+    setParent(parent);
 }
 public AbstractApplicationContext() {
-	this.resourcePatternResolver = getResourcePatternResolver();
+    this.resourcePatternResolver = getResourcePatternResolver();
 }
 ```
 
@@ -70,7 +70,7 @@ getResourcePatternResolver:
 
 ```java
 protected ResourcePatternResolver getResourcePatternResolver() {
-	return new PathMatchingResourcePatternResolver(this);
+    return new PathMatchingResourcePatternResolver(this);
 }
 ```
 
@@ -82,15 +82,15 @@ PathMatchingResourcePatternResolver支持Ant风格的路径解析。
 
 ```java
 public void setConfigLocations(String... locations) {
-	if (locations != null) {
-		Assert.noNullElements(locations, "Config locations must not be null");
-		this.configLocations = new String[locations.length];
-		for (int i = 0; i < locations.length; i++) {
-			this.configLocations[i] = resolvePath(locations[i]).trim();
-		}
-	} else {
-		this.configLocations = null;
-	}
+    if (locations != null) {
+        Assert.noNullElements(locations, "Config locations must not be null");
+        this.configLocations = new String[locations.length];
+        for (int i = 0; i < locations.length; i++) {
+            this.configLocations[i] = resolvePath(locations[i]).trim();
+        }
+    } else {
+        this.configLocations = null;
+    }
 }
 ```
 
@@ -98,7 +98,7 @@ resolvePath:
 
 ```java
 protected String resolvePath(String path) {
-	return getEnvironment().resolveRequiredPlaceholders(path);
+    return getEnvironment().resolveRequiredPlaceholders(path);
 }
 ```
 
@@ -108,7 +108,7 @@ getEnvironment方法来自于ConfigurableApplicationContext接口，源码很简
 
 ```java
 protected ConfigurableEnvironment createEnvironment() {
-	return new StandardEnvironment();
+    return new StandardEnvironment();
 }
 ```
 
@@ -126,13 +126,13 @@ Spring Profile特性是从3.1开始的，其主要是为了解决这样一种问
 
 ```xml
 <beans profile="develop">  
-	<context:property-placeholder location="classpath*:jdbc-develop.properties"/>  
+    <context:property-placeholder location="classpath*:jdbc-develop.properties"/>  
 </beans>  
 <beans profile="production">  
-	<context:property-placeholder location="classpath*:jdbc-production.properties"/>  
+    <context:property-placeholder location="classpath*:jdbc-production.properties"/>  
 </beans>  
 <beans profile="test">  
-	<context:property-placeholder location="classpath*:jdbc-test.properties"/>  
+    <context:property-placeholder location="classpath*:jdbc-test.properties"/>  
 </beans>
 ```
 
@@ -159,7 +159,7 @@ context.getEnvironment().setActiveProfiles("dev");
 ```java
 private final MutablePropertySources propertySources = new MutablePropertySources(this.logger);
 public AbstractEnvironment() {
-	customizePropertySources(this.propertySources);
+    customizePropertySources(this.propertySources);
 }
 ```
 
@@ -180,10 +180,10 @@ public static final String SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME = "systemEnvi
 public static final String SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME = "systemProperties";
 @Override
 protected void customizePropertySources(MutablePropertySources propertySources) {
-	propertySources.addLast(new MapPropertySource
-		(SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME, getSystemProperties()));
-	propertySources.addLast(new SystemEnvironmentPropertySource
-		(SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, getSystemEnvironment()));
+    propertySources.addLast(new MapPropertySource
+        (SYSTEM_PROPERTIES_PROPERTY_SOURCE_NAME, getSystemProperties()));
+    propertySources.addLast(new SystemEnvironmentPropertySource
+        (SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME, getSystemEnvironment()));
 }
 ```
 
@@ -198,27 +198,27 @@ AbstractEnvironment.getSystemProperties:
 ```java
 @Override
 public Map<String, Object> getSystemProperties() {
-	try {
-		return (Map) System.getProperties();
-	}
-	catch (AccessControlException ex) {
-		return (Map) new ReadOnlySystemAttributesMap() {
-			@Override
-			protected String getSystemAttribute(String attributeName) {
-				try {
-					return System.getProperty(attributeName);
-				}
-				catch (AccessControlException ex) {
-					if (logger.isInfoEnabled()) {
-						logger.info(format("Caught AccessControlException when accessing system " +
-								"property [%s]; its value will be returned [null]. Reason: %s",
-								attributeName, ex.getMessage()));
-					}
-					return null;
-				}
-			}
-		};
-	}
+    try {
+        return (Map) System.getProperties();
+    }
+    catch (AccessControlException ex) {
+        return (Map) new ReadOnlySystemAttributesMap() {
+            @Override
+            protected String getSystemAttribute(String attributeName) {
+                try {
+                    return System.getProperty(attributeName);
+                }
+                catch (AccessControlException ex) {
+                    if (logger.isInfoEnabled()) {
+                        logger.info(format("Caught AccessControlException when accessing system " +
+                                "property [%s]; its value will be returned [null]. Reason: %s",
+                                attributeName, ex.getMessage()));
+                    }
+                    return null;
+                }
+            }
+        };
+    }
 }
 ```
 
@@ -233,8 +233,8 @@ AbstractEnvironment.resolveRequiredPlaceholders:
 ```java
 @Override
 public String resolveRequiredPlaceholders(String text) throws IllegalArgumentException {
-  	//text即配置文件路径，比如classpath:config.xml
-	return this.propertyResolver.resolveRequiredPlaceholders(text);
+    //text即配置文件路径，比如classpath:config.xml
+    return this.propertyResolver.resolveRequiredPlaceholders(text);
 }
 ```
 
@@ -242,7 +242,7 @@ propertyResolver是一个PropertySourcesPropertyResolver对象:
 
 ```java
 private final ConfigurablePropertyResolver propertyResolver =
-			new PropertySourcesPropertyResolver(this.propertySources);
+            new PropertySourcesPropertyResolver(this.propertySources);
 ```
 
 ##### PropertyResolver接口
@@ -260,18 +260,18 @@ AbstractPropertyResolver.resolveRequiredPlaceholders:
 ```java
 @Override
 public String resolveRequiredPlaceholders(String text) throws IllegalArgumentException {
-	if (this.strictHelper == null) {
-		this.strictHelper = createPlaceholderHelper(false);
-	}
-	return doResolvePlaceholders(text, this.strictHelper);
+    if (this.strictHelper == null) {
+        this.strictHelper = createPlaceholderHelper(false);
+    }
+    return doResolvePlaceholders(text, this.strictHelper);
 }
 ```
 
 ```java
 private PropertyPlaceholderHelper createPlaceholderHelper(boolean ignoreUnresolvablePlaceholders) {
-  	//三个参数分别是${, }, :
-	return new PropertyPlaceholderHelper(this.placeholderPrefix, this.placeholderSuffix,
-		this.valueSeparator, ignoreUnresolvablePlaceholders);
+    //三个参数分别是${, }, :
+    return new PropertyPlaceholderHelper(this.placeholderPrefix, this.placeholderSuffix,
+        this.valueSeparator, ignoreUnresolvablePlaceholders);
 }
 ```
 
@@ -279,13 +279,13 @@ doResolvePlaceholders：
 
 ```java
 private String doResolvePlaceholders(String text, PropertyPlaceholderHelper helper) {
-  	//PlaceholderResolver接口依然是策略模式的体现
-	return helper.replacePlaceholders(text, new PropertyPlaceholderHelper.PlaceholderResolver() {
-		@Override
-		public String resolvePlaceholder(String placeholderName) {
-			return getPropertyAsRawString(placeholderName);
-		}
-	});
+    //PlaceholderResolver接口依然是策略模式的体现
+    return helper.replacePlaceholders(text, new PropertyPlaceholderHelper.PlaceholderResolver() {
+        @Override
+        public String resolvePlaceholder(String placeholderName) {
+            return getPropertyAsRawString(placeholderName);
+        }
+    });
 }
 ```
 
@@ -302,16 +302,16 @@ SimpleBean bean = context.getBean(SimpleBean.class);
 ```java
 @Override
 protected String getPropertyAsRawString(String key) {
-	return getProperty(key, String.class, false);
+    return getProperty(key, String.class, false);
 }
 protected <T> T getProperty(String key, Class<T> targetValueType, boolean resolveNestedPlaceholders) {
-	if (this.propertySources != null) {
-		for (PropertySource<?> propertySource : this.propertySources) {
-			Object value = propertySource.getProperty(key);
-			return value;
-		}
-	}
-	return null;
+    if (this.propertySources != null) {
+        for (PropertySource<?> propertySource : this.propertySources) {
+            Object value = propertySource.getProperty(key);
+            return value;
+        }
+    }
+    return null;
 }
 ```
 
@@ -328,45 +328,45 @@ AbstractApplicationContext.refresh:
 ```java
 @Override
 public void refresh() throws BeansException, IllegalStateException {
-	synchronized (this.startupShutdownMonitor) {
-		// Prepare this context for refreshing.
-		prepareRefresh();
-		// Tell the subclass to refresh the internal bean factory.
-		ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
-		// Prepare the bean factory for use in this context.
-		prepareBeanFactory(beanFactory);
-		try {
-			// Allows post-processing of the bean factory in context subclasses.
-			postProcessBeanFactory(beanFactory);
-			// Invoke factory processors registered as beans in the context.
-			invokeBeanFactoryPostProcessors(beanFactory);
-			// Register bean processors that intercept bean creation.
-			registerBeanPostProcessors(beanFactory);
-			// Initialize message source for this context.
-			initMessageSource();
-			// Initialize event multicaster for this context.
-			initApplicationEventMulticaster();
-			// Initialize other special beans in specific context subclasses.
-			onRefresh();
-			// Check for listener beans and register them.
-			registerListeners();
-			// Instantiate all remaining (non-lazy-init) singletons.
-			finishBeanFactoryInitialization(beanFactory);
-			// Last step: publish corresponding event.
-			finishRefresh();
-		} catch (BeansException ex) {
-			// Destroy already created singletons to avoid dangling resources.
-			destroyBeans();
-			// Reset 'active' flag.
-			cancelRefresh(ex);
-			// Propagate exception to caller.
-			throw ex;
-		} finally {
-			// Reset common introspection caches in Spring's core, since we
-			// might not ever need metadata for singleton beans anymore...
-			resetCommonCaches();
-		}
-	}
+    synchronized (this.startupShutdownMonitor) {
+        // Prepare this context for refreshing.
+        prepareRefresh();
+        // Tell the subclass to refresh the internal bean factory.
+        ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
+        // Prepare the bean factory for use in this context.
+        prepareBeanFactory(beanFactory);
+        try {
+            // Allows post-processing of the bean factory in context subclasses.
+            postProcessBeanFactory(beanFactory);
+            // Invoke factory processors registered as beans in the context.
+            invokeBeanFactoryPostProcessors(beanFactory);
+            // Register bean processors that intercept bean creation.
+            registerBeanPostProcessors(beanFactory);
+            // Initialize message source for this context.
+            initMessageSource();
+            // Initialize event multicaster for this context.
+            initApplicationEventMulticaster();
+            // Initialize other special beans in specific context subclasses.
+            onRefresh();
+            // Check for listener beans and register them.
+            registerListeners();
+            // Instantiate all remaining (non-lazy-init) singletons.
+            finishBeanFactoryInitialization(beanFactory);
+            // Last step: publish corresponding event.
+            finishRefresh();
+        } catch (BeansException ex) {
+            // Destroy already created singletons to avoid dangling resources.
+            destroyBeans();
+            // Reset 'active' flag.
+            cancelRefresh(ex);
+            // Propagate exception to caller.
+            throw ex;
+        } finally {
+            // Reset common introspection caches in Spring's core, since we
+            // might not ever need metadata for singleton beans anymore...
+            resetCommonCaches();
+        }
+    }
 }
 ```
 
@@ -374,18 +374,18 @@ public void refresh() throws BeansException, IllegalStateException {
 
 ```java
 protected void prepareRefresh() {
-	this.startupDate = System.currentTimeMillis();
-	this.closed.set(false);
-	this.active.set(true);
-	// Initialize any placeholder property sources in the context environment
-  	//空实现
-	initPropertySources();
-	// Validate that all properties marked as required are resolvable
-	// see ConfigurablePropertyResolver#setRequiredProperties
-	getEnvironment().validateRequiredProperties();
-	// Allow for the collection of early ApplicationEvents,
-	// to be published once the multicaster is available...
-	this.earlyApplicationEvents = new LinkedHashSet<ApplicationEvent>();
+    this.startupDate = System.currentTimeMillis();
+    this.closed.set(false);
+    this.active.set(true);
+    // Initialize any placeholder property sources in the context environment
+    //空实现
+    initPropertySources();
+    // Validate that all properties marked as required are resolvable
+    // see ConfigurablePropertyResolver#setRequiredProperties
+    getEnvironment().validateRequiredProperties();
+    // Allow for the collection of early ApplicationEvents,
+    // to be published once the multicaster is available...
+    this.earlyApplicationEvents = new LinkedHashSet<ApplicationEvent>();
 }
 ```
 
@@ -396,7 +396,7 @@ AbstractEnvironment.validateRequiredProperties:
 ```java
 @Override
 public void validateRequiredProperties() throws MissingRequiredPropertiesException {
-	this.propertyResolver.validateRequiredProperties();
+    this.propertyResolver.validateRequiredProperties();
 }
 ```
 
@@ -405,15 +405,15 @@ AbstractPropertyResolver.validateRequiredProperties:
 ```java
 @Override
 public void validateRequiredProperties() {
-	MissingRequiredPropertiesException ex = new MissingRequiredPropertiesException();
-	for (String key : this.requiredProperties) {
-		if (this.getProperty(key) == null) {
-			ex.addMissingRequiredProperty(key);
-		}
-	}
-	if (!ex.getMissingRequiredProperties().isEmpty()) {
-		throw ex;
-	}
+    MissingRequiredPropertiesException ex = new MissingRequiredPropertiesException();
+    for (String key : this.requiredProperties) {
+        if (this.getProperty(key) == null) {
+            ex.addMissingRequiredProperty(key);
+        }
+    }
+    if (!ex.getMissingRequiredProperties().isEmpty()) {
+        throw ex;
+    }
 }
 ```
 
@@ -426,18 +426,18 @@ requiredProperties是通过setRequiredProperties方法设置的，保存在一�
 ```java
 @Override
 protected final void refreshBeanFactory() throws BeansException {
-  	//如果已经存在，那么销毁之前的
-	if (hasBeanFactory()) {
-		destroyBeans();
-		closeBeanFactory();
-	}
+    //如果已经存在，那么销毁之前的
+    if (hasBeanFactory()) {
+        destroyBeans();
+        closeBeanFactory();
+    }
     //创建了一个DefaultListableBeanFactory对象
     DefaultListableBeanFactory beanFactory = createBeanFactory();
     beanFactory.setSerializationId(getId());
     customizeBeanFactory(beanFactory);
     loadBeanDefinitions(beanFactory);
     synchronized (this.beanFactoryMonitor) {
-    	this.beanFactory = beanFactory;
+        this.beanFactory = beanFactory;
     }
 }
 ```
@@ -454,14 +454,14 @@ AbstractRefreshableApplicationContext.customizeBeanFactory方法用于给子类�
 
 ```java
 protected void customizeBeanFactory(DefaultListableBeanFactory beanFactory) {
-	if (this.allowBeanDefinitionOverriding != null) {
-      	//默认false，不允许覆盖
-		beanFactory.setAllowBeanDefinitionOverriding(this.allowBeanDefinitionOverriding);
-	}
-	if (this.allowCircularReferences != null) {
-      	//默认false，不允许循环引用
-		beanFactory.setAllowCircularReferences(this.allowCircularReferences);
-	}
+    if (this.allowBeanDefinitionOverriding != null) {
+        //默认false，不允许覆盖
+        beanFactory.setAllowBeanDefinitionOverriding(this.allowBeanDefinitionOverriding);
+    }
+    if (this.allowCircularReferences != null) {
+        //默认false，不允许循环引用
+        beanFactory.setAllowCircularReferences(this.allowCircularReferences);
+    }
 }
 ```
 
@@ -472,18 +472,18 @@ AbstractXmlApplicationContext.loadBeanDefinitions，这个便是核心的bean加
 ```java
 @Override
 protected void loadBeanDefinitions(DefaultListableBeanFactory beanFactory) {
-	// Create a new XmlBeanDefinitionReader for the given BeanFactory.
-	XmlBeanDefinitionReader beanDefinitionReader = new XmlBeanDefinitionReader(beanFactory);
-	// Configure the bean definition reader with this context's
-	// resource loading environment.
-	beanDefinitionReader.setEnvironment(this.getEnvironment());
-	beanDefinitionReader.setResourceLoader(this);
-	beanDefinitionReader.setEntityResolver(new ResourceEntityResolver(this));
-	// Allow a subclass to provide custom initialization of the reader,
-	// then proceed with actually loading the bean definitions.
-  	//默认空实现
-	initBeanDefinitionReader(beanDefinitionReader);
-	loadBeanDefinitions(beanDefinitionReader);
+    // Create a new XmlBeanDefinitionReader for the given BeanFactory.
+    XmlBeanDefinitionReader beanDefinitionReader = new XmlBeanDefinitionReader(beanFactory);
+    // Configure the bean definition reader with this context's
+    // resource loading environment.
+    beanDefinitionReader.setEnvironment(this.getEnvironment());
+    beanDefinitionReader.setResourceLoader(this);
+    beanDefinitionReader.setEntityResolver(new ResourceEntityResolver(this));
+    // Allow a subclass to provide custom initialization of the reader,
+    // then proceed with actually loading the bean definitions.
+    //默认空实现
+    initBeanDefinitionReader(beanDefinitionReader);
+    loadBeanDefinitions(beanDefinitionReader);
 }
 ```
 
@@ -507,15 +507,15 @@ EntityResolver接口在org.xml.sax中定义。DelegatingEntityResolver用于sche
 
 ```java
 protected void loadBeanDefinitions(XmlBeanDefinitionReader reader) {
-	Resource[] configResources = getConfigResources();
-	if (configResources != null) {
-		reader.loadBeanDefinitions(configResources);
-	}
-	String[] configLocations = getConfigLocations();
-  	//here
-	if (configLocations != null) {
-		reader.loadBeanDefinitions(configLocations);
-	}
+    Resource[] configResources = getConfigResources();
+    if (configResources != null) {
+        reader.loadBeanDefinitions(configResources);
+    }
+    String[] configLocations = getConfigLocations();
+    //here
+    if (configLocations != null) {
+        reader.loadBeanDefinitions(configLocations);
+    }
 }
 ```
 
@@ -524,12 +524,12 @@ AbstractBeanDefinitionReader.loadBeanDefinitions:
 ```java
 @Override
 public int loadBeanDefinitions(String... locations) throws BeanDefinitionStoreException {
-	Assert.notNull(locations, "Location array must not be null");
-	int counter = 0;
-	for (String location : locations) {
-		counter += loadBeanDefinitions(location);
-	}
-	return counter;
+    Assert.notNull(locations, "Location array must not be null");
+    int counter = 0;
+    for (String location : locations) {
+        counter += loadBeanDefinitions(location);
+    }
+    return counter;
 }
 ```
 
@@ -538,34 +538,34 @@ public int loadBeanDefinitions(String... locations) throws BeanDefinitionStoreEx
 ```java
 //第二个参数为空
 public int loadBeanDefinitions(String location, Set<Resource> actualResources) {
-	ResourceLoader resourceLoader = getResourceLoader();
-  	//参见ResourceLoader类图，ClassPathXmlApplicationContext实现了此接口
-	if (resourceLoader instanceof ResourcePatternResolver) {
-		// Resource pattern matching available.
-		try {
-			Resource[] resources = ((ResourcePatternResolver) resourceLoader).getResources(location);
-			int loadCount = loadBeanDefinitions(resources);
-			if (actualResources != null) {
-				for (Resource resource : resources) {
-					actualResources.add(resource);
-				}
-			}
-			return loadCount;
-		}
-		catch (IOException ex) {
-			throw new BeanDefinitionStoreException(
-					"Could not resolve bean definition resource pattern [" + location + "]", ex);
-		}
-	}
-	else {
-		// Can only load single resources by absolute URL.
-		Resource resource = resourceLoader.getResource(location);
-		int loadCount = loadBeanDefinitions(resource);
-		if (actualResources != null) {
-			actualResources.add(resource);
-		}
-		return loadCount;
-	}
+    ResourceLoader resourceLoader = getResourceLoader();
+    //参见ResourceLoader类图，ClassPathXmlApplicationContext实现了此接口
+    if (resourceLoader instanceof ResourcePatternResolver) {
+        // Resource pattern matching available.
+        try {
+            Resource[] resources = ((ResourcePatternResolver) resourceLoader).getResources(location);
+            int loadCount = loadBeanDefinitions(resources);
+            if (actualResources != null) {
+                for (Resource resource : resources) {
+                    actualResources.add(resource);
+                }
+            }
+            return loadCount;
+        }
+        catch (IOException ex) {
+            throw new BeanDefinitionStoreException(
+                    "Could not resolve bean definition resource pattern [" + location + "]", ex);
+        }
+    }
+    else {
+        // Can only load single resources by absolute URL.
+        Resource resource = resourceLoader.getResource(location);
+        int loadCount = loadBeanDefinitions(resource);
+        if (actualResources != null) {
+            actualResources.add(resource);
+        }
+        return loadCount;
+    }
 }
 ```
 
@@ -574,8 +574,8 @@ getResource的实现在AbstractApplicationContext：
 ```java
 @Override
 public Resource[] getResources(String locationPattern) throws IOException {
-  	//构造器中初始化，PathMatchingResourcePatternResolver对象
-	return this.resourcePatternResolver.getResources(locationPattern);
+    //构造器中初始化，PathMatchingResourcePatternResolver对象
+    return this.resourcePatternResolver.getResources(locationPattern);
 }
 ```
 
@@ -584,33 +584,33 @@ PathMatchingResourcePatternResolver是ResourceLoader继承体系的一部分。
 ```java
 @Override
 public Resource[] getResources(String locationPattern) throws IOException {
-	Assert.notNull(locationPattern, "Location pattern must not be null");
-  	//classpath:
-	if (locationPattern.startsWith(CLASSPATH_ALL_URL_PREFIX)) {
-		// a class path resource (multiple resources for same name possible)
-      	//matcher是一个AntPathMatcher对象
-		if (getPathMatcher().isPattern(locationPattern
-			.substring(CLASSPATH_ALL_URL_PREFIX.length()))) {
-			// a class path resource pattern
-			return findPathMatchingResources(locationPattern);
-		} else {
-			// all class path resources with the given name
-			return findAllClassPathResources(locationPattern
-				.substring(CLASSPATH_ALL_URL_PREFIX.length()));
-		}
-	} else {
-		// Only look for a pattern after a prefix here
-		// (to not get fooled by a pattern symbol in a strange prefix).
-		int prefixEnd = locationPattern.indexOf(":") + 1;
-		if (getPathMatcher().isPattern(locationPattern.substring(prefixEnd))) {
-			// a file pattern
-			return findPathMatchingResources(locationPattern);
-		}
-		else {
-			// a single resource with the given name
-			return new Resource[] {getResourceLoader().getResource(locationPattern)};
-		}
-	}
+    Assert.notNull(locationPattern, "Location pattern must not be null");
+    //classpath:
+    if (locationPattern.startsWith(CLASSPATH_ALL_URL_PREFIX)) {
+        // a class path resource (multiple resources for same name possible)
+        //matcher是一个AntPathMatcher对象
+        if (getPathMatcher().isPattern(locationPattern
+            .substring(CLASSPATH_ALL_URL_PREFIX.length()))) {
+            // a class path resource pattern
+            return findPathMatchingResources(locationPattern);
+        } else {
+            // all class path resources with the given name
+            return findAllClassPathResources(locationPattern
+                .substring(CLASSPATH_ALL_URL_PREFIX.length()));
+        }
+    } else {
+        // Only look for a pattern after a prefix here
+        // (to not get fooled by a pattern symbol in a strange prefix).
+        int prefixEnd = locationPattern.indexOf(":") + 1;
+        if (getPathMatcher().isPattern(locationPattern.substring(prefixEnd))) {
+            // a file pattern
+            return findPathMatchingResources(locationPattern);
+        }
+        else {
+            // a single resource with the given name
+            return new Resource[] {getResourceLoader().getResource(locationPattern)};
+        }
+    }
 }
 ```
 
@@ -619,7 +619,7 @@ isPattern:
 ```java
 @Override
 public boolean isPattern(String path) {
-	return (path.indexOf('*') != -1 || path.indexOf('?') != -1);
+    return (path.indexOf('*') != -1 || path.indexOf('?') != -1);
 }
 ```
 
@@ -647,7 +647,7 @@ int loadCount = loadBeanDefinitions(resources);
 ```java
 @Override
 public int loadBeanDefinitions(Resource resource) {
-	return loadBeanDefinitions(new EncodedResource(resource));
+    return loadBeanDefinitions(new EncodedResource(resource));
 }
 ```
 
@@ -661,9 +661,9 @@ EncodedResource扮演的其实是一个装饰器的模式，为InputStreamSource
 
 ```java
 public int loadBeanDefinitions(EncodedResource encodedResource) throws BeanDefinitionStoreException {
-	InputStream inputStream = encodedResource.getResource().getInputStream();
-  	InputSource inputSource = new InputSource(inputStream);
-	return doLoadBeanDefinitions(inputSource, encodedResource.getResource());
+    InputStream inputStream = encodedResource.getResource().getInputStream();
+    InputSource inputSource = new InputSource(inputStream);
+    return doLoadBeanDefinitions(inputSource, encodedResource.getResource());
 }
 ```
 
@@ -673,8 +673,8 @@ doLoadBeanDefinitions：
 
 ```java
 protected int doLoadBeanDefinitions(InputSource inputSource, Resource resource) {
-	Document doc = doLoadDocument(inputSource, resource);
-	return registerBeanDefinitions(doc, resource);
+    Document doc = doLoadDocument(inputSource, resource);
+    return registerBeanDefinitions(doc, resource);
 }
 ```
 
@@ -682,8 +682,8 @@ doLoadDocument:
 
 ```java
 protected Document doLoadDocument(InputSource inputSource, Resource resource) {
-	return this.documentLoader.loadDocument(inputSource, getEntityResolver(), this.errorHandler,
-		getValidationModeForResource(resource), isNamespaceAware());
+    return this.documentLoader.loadDocument(inputSource, getEntityResolver(), this.errorHandler,
+        getValidationModeForResource(resource), isNamespaceAware());
 }
 ```
 
@@ -698,11 +698,11 @@ DefaultDocumentLoader.loadDocument:
 ```java
 @Override
 public Document loadDocument(InputSource inputSource, EntityResolver entityResolver,
-	ErrorHandler errorHandler, int validationMode, boolean namespaceAware) {
-  	//这里就是老套路了，可以看出，Spring还是使用了dom的方式解析，即一次全部load到内存
-	DocumentBuilderFactory factory = createDocumentBuilderFactory(validationMode, namespaceAware);
-	DocumentBuilder builder = createDocumentBuilder(factory, entityResolver, errorHandler);
-	return builder.parse(inputSource);
+    ErrorHandler errorHandler, int validationMode, boolean namespaceAware) {
+    //这里就是老套路了，可以看出，Spring还是使用了dom的方式解析，即一次全部load到内存
+    DocumentBuilderFactory factory = createDocumentBuilderFactory(validationMode, namespaceAware);
+    DocumentBuilder builder = createDocumentBuilder(factory, entityResolver, errorHandler);
+    return builder.parse(inputSource);
 }
 ```
 
@@ -710,20 +710,20 @@ createDocumentBuilderFactory比较有意思:
 
 ```java
 protected DocumentBuilderFactory createDocumentBuilderFactory(int validationMode, boolean namespaceAware{
-	DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-	factory.setNamespaceAware(namespaceAware);
-	if (validationMode != XmlValidationModeDetector.VALIDATION_NONE) {
-      	//此方法设为true仅对dtd有效，xsd(schema)无效
-		factory.setValidating(true);
-		if (validationMode == XmlValidationModeDetector.VALIDATION_XSD) {
-			// Enforce namespace aware for XSD...
-          	 //开启xsd(schema)支持
-			factory.setNamespaceAware(true);
-          	 //这个也是Java支持Schema的套路，可以问度娘
-			factory.setAttribute(SCHEMA_LANGUAGE_ATTRIBUTE, XSD_SCHEMA_LANGUAGE);
-		}
-	}
-	return factory;
+    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+    factory.setNamespaceAware(namespaceAware);
+    if (validationMode != XmlValidationModeDetector.VALIDATION_NONE) {
+        //此方法设为true仅对dtd有效，xsd(schema)无效
+        factory.setValidating(true);
+        if (validationMode == XmlValidationModeDetector.VALIDATION_XSD) {
+            // Enforce namespace aware for XSD...
+             //开启xsd(schema)支持
+            factory.setNamespaceAware(true);
+             //这个也是Java支持Schema的套路，可以问度娘
+            factory.setAttribute(SCHEMA_LANGUAGE_ATTRIBUTE, XSD_SCHEMA_LANGUAGE);
+        }
+    }
+    return factory;
 }
 ```
 
@@ -733,10 +733,10 @@ XmlBeanDefinitionReader.registerBeanDefinitions:
 
 ```java
 public int registerBeanDefinitions(Document doc, Resource resource) {
-	BeanDefinitionDocumentReader documentReader = createBeanDefinitionDocumentReader();
-	int countBefore = getRegistry().getBeanDefinitionCount();
-	documentReader.registerBeanDefinitions(doc, createReaderContext(resource));
-	return getRegistry().getBeanDefinitionCount() - countBefore;
+    BeanDefinitionDocumentReader documentReader = createBeanDefinitionDocumentReader();
+    int countBefore = getRegistry().getBeanDefinitionCount();
+    documentReader.registerBeanDefinitions(doc, createReaderContext(resource));
+    return getRegistry().getBeanDefinitionCount() - countBefore;
 }
 ```
 
@@ -744,7 +744,7 @@ createBeanDefinitionDocumentReader:
 
 ```java
 protected BeanDefinitionDocumentReader createBeanDefinitionDocumentReader() {
-	return BeanDefinitionDocumentReader.class.cast
+    return BeanDefinitionDocumentReader.class.cast
       //反射
       (BeanUtils.instantiateClass(this.documentReaderClass));
 }
@@ -758,8 +758,8 @@ createReaderContext：
 
 ```java
 public XmlReaderContext createReaderContext(Resource resource) {
-	return new XmlReaderContext(resource, this.problemReporter, this.eventListener,
-		this.sourceExtractor, this, getNamespaceHandlerResolver());
+    return new XmlReaderContext(resource, this.problemReporter, this.eventListener,
+        this.sourceExtractor, this, getNamespaceHandlerResolver());
 }
 ```
 
@@ -778,9 +778,9 @@ DefaultBeanDefinitionDocumentReader.registerBeanDefinitions:
 ```java
 @Override
 public void registerBeanDefinitions(Document doc, XmlReaderContext readerContext) {
-	this.readerContext = readerContext;
-	Element root = doc.getDocumentElement();
-	doRegisterBeanDefinitions(root);
+    this.readerContext = readerContext;
+    Element root = doc.getDocumentElement();
+    doRegisterBeanDefinitions(root);
 }
 ```
 
@@ -788,26 +788,26 @@ doRegisterBeanDefinitions:
 
 ```java
 protected void doRegisterBeanDefinitions(Element root) {
-	BeanDefinitionParserDelegate parent = this.delegate;
-	this.delegate = createDelegate(getReaderContext(), root, parent);
-  	//默认的命名空间即
-  	//http://www.springframework.org/schema/beans
-	if (this.delegate.isDefaultNamespace(root)) {
-      	//检查profile属性
-		String profileSpec = root.getAttribute(PROFILE_ATTRIBUTE);
-		if (StringUtils.hasText(profileSpec)) {
-          	//profile属性可以以,分割
-			String[] specifiedProfiles = StringUtils.tokenizeToStringArray(
-					profileSpec, BeanDefinitionParserDelegate.MULTI_VALUE_ATTRIBUTE_DELIMITERS);
-			if (!getReaderContext().getEnvironment().acceptsProfiles(specifiedProfiles)) {
-				return;
-			}
-		}
-	}
-	preProcessXml(root);
-	parseBeanDefinitions(root, this.delegate);
-	postProcessXml(root);
-	this.delegate = parent;
+    BeanDefinitionParserDelegate parent = this.delegate;
+    this.delegate = createDelegate(getReaderContext(), root, parent);
+    //默认的命名空间即
+    //http://www.springframework.org/schema/beans
+    if (this.delegate.isDefaultNamespace(root)) {
+        //检查profile属性
+        String profileSpec = root.getAttribute(PROFILE_ATTRIBUTE);
+        if (StringUtils.hasText(profileSpec)) {
+            //profile属性可以以,分割
+            String[] specifiedProfiles = StringUtils.tokenizeToStringArray(
+                    profileSpec, BeanDefinitionParserDelegate.MULTI_VALUE_ATTRIBUTE_DELIMITERS);
+            if (!getReaderContext().getEnvironment().acceptsProfiles(specifiedProfiles)) {
+                return;
+            }
+        }
+    }
+    preProcessXml(root);
+    parseBeanDefinitions(root, this.delegate);
+    postProcessXml(root);
+    this.delegate = parent;
 }
 ```
 
@@ -816,10 +816,10 @@ delegate的作用在于处理beans标签的嵌套，其实Spring配置文件是�
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>    
 <beans>    
-  	<bean class="base.SimpleBean"></bean>
-  	<beans>
-  		<bean class="java.lang.Object"></bean>
-  	</beans>
+    <bean class="base.SimpleBean"></bean>
+    <beans>
+        <bean class="java.lang.Object"></bean>
+    </beans>
 </beans>
 ```
 
@@ -837,17 +837,17 @@ xmlns属性就是xml规范定义的用来设置命名空间的。这样设置了
 ```java
 @Override
 public boolean acceptsProfiles(String... profiles) {
-	Assert.notEmpty(profiles, "Must specify at least one profile");
-	for (String profile : profiles) {
-		if (StringUtils.hasLength(profile) && profile.charAt(0) == '!') {
-			if (!isProfileActive(profile.substring(1))) {
-				return true;
-			}
-		} else if (isProfileActive(profile)) {
-			return true;
-		}
-	}
-	return false;
+    Assert.notEmpty(profiles, "Must specify at least one profile");
+    for (String profile : profiles) {
+        if (StringUtils.hasLength(profile) && profile.charAt(0) == '!') {
+            if (!isProfileActive(profile.substring(1))) {
+                return true;
+            }
+        } else if (isProfileActive(profile)) {
+            return true;
+        }
+    }
+    return false;
 }
 ```
 
@@ -859,22 +859,22 @@ DefaultBeanDefinitionDocumentReader.parseBeanDefinitions：
 
 ```java
 protected void parseBeanDefinitions(Element root, BeanDefinitionParserDelegate delegate) {
-	if (delegate.isDefaultNamespace(root)) {
-		NodeList nl = root.getChildNodes();
-		for (int i = 0; i < nl.getLength(); i++) {
-			Node node = nl.item(i);
-			if (node instanceof Element) {
-				Element ele = (Element) node;
-				if (delegate.isDefaultNamespace(ele)) {
-					parseDefaultElement(ele, delegate);
-				} else {
-					delegate.parseCustomElement(ele);
-				}
-			}
-		}
-	} else {
-		delegate.parseCustomElement(root);
-	}
+    if (delegate.isDefaultNamespace(root)) {
+        NodeList nl = root.getChildNodes();
+        for (int i = 0; i < nl.getLength(); i++) {
+            Node node = nl.item(i);
+            if (node instanceof Element) {
+                Element ele = (Element) node;
+                if (delegate.isDefaultNamespace(ele)) {
+                    parseDefaultElement(ele, delegate);
+                } else {
+                    delegate.parseCustomElement(ele);
+                }
+            }
+        }
+    } else {
+        delegate.parseCustomElement(root);
+    }
 }
 ```
 
@@ -886,20 +886,20 @@ protected void parseBeanDefinitions(Element root, BeanDefinitionParserDelegate d
 
 ```java
 private void parseDefaultElement(Element ele, BeanDefinitionParserDelegate delegate) {
-  	//"import"
-	if (delegate.nodeNameEquals(ele, IMPORT_ELEMENT)) {
-		importBeanDefinitionResource(ele);
-	}
-	else if (delegate.nodeNameEquals(ele, ALIAS_ELEMENT)) {
-		processAliasRegistration(ele);
-	}
-	else if (delegate.nodeNameEquals(ele, BEAN_ELEMENT)) {
-		processBeanDefinition(ele, delegate);
-	}
-	else if (delegate.nodeNameEquals(ele, NESTED_BEANS_ELEMENT)) {
-		// recurse
-		doRegisterBeanDefinitions(ele);
-	}
+    //"import"
+    if (delegate.nodeNameEquals(ele, IMPORT_ELEMENT)) {
+        importBeanDefinitionResource(ele);
+    }
+    else if (delegate.nodeNameEquals(ele, ALIAS_ELEMENT)) {
+        processAliasRegistration(ele);
+    }
+    else if (delegate.nodeNameEquals(ele, BEAN_ELEMENT)) {
+        processBeanDefinition(ele, delegate);
+    }
+    else if (delegate.nodeNameEquals(ele, NESTED_BEANS_ELEMENT)) {
+        // recurse
+        doRegisterBeanDefinitions(ele);
+    }
 }
 ```
 
@@ -926,10 +926,10 @@ processAliasRegistration核心源码:
 
 ```java
 protected void processAliasRegistration(Element ele) {
-	String name = ele.getAttribute(NAME_ATTRIBUTE);
-	String alias = ele.getAttribute(ALIAS_ATTRIBUTE);
-	getReaderContext().getRegistry().registerAlias(name, alias);
-	getReaderContext().fireAliasRegistered(name, alias, extractSource(ele));
+    String name = ele.getAttribute(NAME_ATTRIBUTE);
+    String alias = ele.getAttribute(ALIAS_ATTRIBUTE);
+    getReaderContext().getRegistry().registerAlias(name, alias);
+    getReaderContext().fireAliasRegistered(name, alias, extractSource(ele));
 }
 ```
 
@@ -938,28 +938,28 @@ protected void processAliasRegistration(Element ele) {
 ```java
 @Override
 public void registerAlias(String name, String alias) {
-	Assert.hasText(name, "'name' must not be empty");
-	Assert.hasText(alias, "'alias' must not be empty");
-  	//名字和别名一样
-	if (alias.equals(name)) {
-      	//ConcurrentHashMap
-		this.aliasMap.remove(alias);
-	} else {
-		String registeredName = this.aliasMap.get(alias);
-		if (registeredName != null) {
-			if (registeredName.equals(name)) {
-				// An existing alias - no need to re-register
-				return;
-			}
-			if (!allowAliasOverriding()) {
-				throw new IllegalStateException
-					("Cannot register alias '" + alias + "' for name '" +
-					name + "': It is already registered for name '" + registeredName + "'.");
-			}
-		}
-		checkForAliasCircle(name, alias);
-		this.aliasMap.put(alias, name);
-	}
+    Assert.hasText(name, "'name' must not be empty");
+    Assert.hasText(alias, "'alias' must not be empty");
+    //名字和别名一样
+    if (alias.equals(name)) {
+        //ConcurrentHashMap
+        this.aliasMap.remove(alias);
+    } else {
+        String registeredName = this.aliasMap.get(alias);
+        if (registeredName != null) {
+            if (registeredName.equals(name)) {
+                // An existing alias - no need to re-register
+                return;
+            }
+            if (!allowAliasOverriding()) {
+                throw new IllegalStateException
+                    ("Cannot register alias '" + alias + "' for name '" +
+                    name + "': It is already registered for name '" + registeredName + "'.");
+            }
+        }
+        checkForAliasCircle(name, alias);
+        this.aliasMap.put(alias, name);
+    }
 }
 ```
 
@@ -973,21 +973,21 @@ DefaultBeanDefinitionDocumentReader.processBeanDefinition:
 
 ```java
 protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {
-	BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
-	if (bdHolder != null) {
-		bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
-		try {
-			// Register the final decorated instance.
-			BeanDefinitionReaderUtils.registerBeanDefinition
-				(bdHolder, getReaderContext().getRegistry());
-		}
-		catch (BeanDefinitionStoreException ex) {
-			getReaderContext().error("Failed to register bean definition with name '" +
-					bdHolder.getBeanName() + "'", ele, ex);
-		}
-		// Send registration event.
-		getReaderContext().fireComponentRegistered(new BeanComponentDefinition(bdHolder));
-	}
+    BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
+    if (bdHolder != null) {
+        bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
+        try {
+            // Register the final decorated instance.
+            BeanDefinitionReaderUtils.registerBeanDefinition
+                (bdHolder, getReaderContext().getRegistry());
+        }
+        catch (BeanDefinitionStoreException ex) {
+            getReaderContext().error("Failed to register bean definition with name '" +
+                    bdHolder.getBeanName() + "'", ele, ex);
+        }
+        // Send registration event.
+        getReaderContext().fireComponentRegistered(new BeanComponentDefinition(bdHolder));
+    }
 }
 ```
 
@@ -1002,21 +1002,21 @@ String id = ele.getAttribute(ID_ATTRIBUTE);
 String nameAttr = ele.getAttribute(NAME_ATTRIBUTE);
 List<String> aliases = new ArrayList<String>();
 if (StringUtils.hasLength(nameAttr)) {
-  	//按,分隔
-	String[] nameArr = StringUtils.tokenizeToStringArray
-		(nameAttr, MULTI_VALUE_ATTRIBUTE_DELIMITERS);
-	aliases.addAll(Arrays.asList(nameArr));
+    //按,分隔
+    String[] nameArr = StringUtils.tokenizeToStringArray
+        (nameAttr, MULTI_VALUE_ATTRIBUTE_DELIMITERS);
+    aliases.addAll(Arrays.asList(nameArr));
 }
 String beanName = id;
 if (!StringUtils.hasText(beanName) && !aliases.isEmpty()) {
-  	//name的第一个值作为id
-	beanName = aliases.remove(0);
+    //name的第一个值作为id
+    beanName = aliases.remove(0);
 }
 //默认null
 if (containingBean == null) {
-  	//校验id是否已重复，如果重复直接抛异常
-  	//校验是通过内部一个HashSet完成的，出现过的id都会保存进此Set
-	checkNameUniqueness(beanName, aliases, ele);
+    //校验id是否已重复，如果重复直接抛异常
+    //校验是通过内部一个HashSet完成的，出现过的id都会保存进此Set
+    checkNameUniqueness(beanName, aliases, ele);
 }
 ```
 
@@ -1036,32 +1036,32 @@ aliases.add(beanClassName);
 
 ```java
 public static String generateBeanName(
-		BeanDefinition definition, BeanDefinitionRegistry registry, boolean isInnerBean) {
-	String generatedBeanName = definition.getBeanClassName();
-	if (generatedBeanName == null) {
-		if (definition.getParentName() != null) {
-			generatedBeanName = definition.getParentName() + "$child";
-          	 //工厂方法产生的bean
-		} else if (definition.getFactoryBeanName() != null) {
-			generatedBeanName = definition.getFactoryBeanName() + "$created";
-		}
-	}
-	String id = generatedBeanName;
-	if (isInnerBean) {
-		// Inner bean: generate identity hashcode suffix.
-		id = generatedBeanName + GENERATED_BEAN_NAME_SEPARATOR + 
-			ObjectUtils.getIdentityHexString(definition);
-	} else {
-		// Top-level bean: use plain class name.
-		// Increase counter until the id is unique.
-		int counter = -1;
-      	 //用类名#自增的数字命名
-		while (counter == -1 || registry.containsBeanDefinition(id)) {
-			counter++;
-			id = generatedBeanName + GENERATED_BEAN_NAME_SEPARATOR + counter;
-		}
-	}
-	return id;
+        BeanDefinition definition, BeanDefinitionRegistry registry, boolean isInnerBean) {
+    String generatedBeanName = definition.getBeanClassName();
+    if (generatedBeanName == null) {
+        if (definition.getParentName() != null) {
+            generatedBeanName = definition.getParentName() + "$child";
+             //工厂方法产生的bean
+        } else if (definition.getFactoryBeanName() != null) {
+            generatedBeanName = definition.getFactoryBeanName() + "$created";
+        }
+    }
+    String id = generatedBeanName;
+    if (isInnerBean) {
+        // Inner bean: generate identity hashcode suffix.
+        id = generatedBeanName + GENERATED_BEAN_NAME_SEPARATOR + 
+            ObjectUtils.getIdentityHexString(definition);
+    } else {
+        // Top-level bean: use plain class name.
+        // Increase counter until the id is unique.
+        int counter = -1;
+         //用类名#自增的数字命名
+        while (counter == -1 || registry.containsBeanDefinition(id)) {
+            counter++;
+            id = generatedBeanName + GENERATED_BEAN_NAME_SEPARATOR + counter;
+        }
+    }
+    return id;
 }
 ```
 
@@ -1074,11 +1074,11 @@ public static String generateBeanName(
 ```java
 String className = null;
 if (ele.hasAttribute(CLASS_ATTRIBUTE)) {
-	className = ele.getAttribute(CLASS_ATTRIBUTE).trim();
+    className = ele.getAttribute(CLASS_ATTRIBUTE).trim();
 }
 String parent = null;
 if (ele.hasAttribute(PARENT_ATTRIBUTE)) {
-	parent = ele.getAttribute(PARENT_ATTRIBUTE);
+    parent = ele.getAttribute(PARENT_ATTRIBUTE);
 }
 AbstractBeanDefinition bd = createBeanDefinition(className, parent);
 ```
@@ -1087,18 +1087,18 @@ BeanDefinition的创建在BeanDefinitionReaderUtils.createBeanDefinition:
 
 ```java
 public static AbstractBeanDefinition createBeanDefinition(
-		String parentName, String className, ClassLoader classLoader) {
-	GenericBeanDefinition bd = new GenericBeanDefinition();
-	bd.setParentName(parentName);
-	if (className != null) {
-		if (classLoader != null) {
-			bd.setBeanClass(ClassUtils.forName(className, classLoader));
-		}
-		else {
-			bd.setBeanClassName(className);
-		}
-	}
-	return bd;
+        String parentName, String className, ClassLoader classLoader) {
+    GenericBeanDefinition bd = new GenericBeanDefinition();
+    bd.setParentName(parentName);
+    if (className != null) {
+        if (classLoader != null) {
+            bd.setBeanClass(ClassUtils.forName(className, classLoader));
+        }
+        else {
+            bd.setBeanClassName(className);
+        }
+    }
+    return bd;
 }
 ```
 
@@ -1112,7 +1112,7 @@ parseBeanDefinitionAttributes(ele, beanName, containingBean, bd);
 
 ```xml
 <bean id="b" name="one, two" class="base.SimpleBean">
-	<description>SimpleBean</description>
+    <description>SimpleBean</description>
 </bean>
 ```
 
@@ -1122,7 +1122,7 @@ parseBeanDefinitionAttributes(ele, beanName, containingBean, bd);
 
 ```xml
 <bean id="b" name="one, two" class="base.SimpleBean">
-	<meta key="name" value="skywalker"/>
+    <meta key="name" value="skywalker"/>
 </bean>
 ```
 
@@ -1130,20 +1130,20 @@ parseBeanDefinitionAttributes(ele, beanName, containingBean, bd);
 
 ```java
 public void parseMetaElements(Element ele, BeanMetadataAttributeAccessor attributeAccessor) {
-	NodeList nl = ele.getChildNodes();
-	for (int i = 0; i < nl.getLength(); i++) {
-		Node node = nl.item(i);
-		if (isCandidateElement(node) && nodeNameEquals(node, META_ELEMENT)) {
-			Element metaElement = (Element) node;
-			String key = metaElement.getAttribute(KEY_ATTRIBUTE);
-			String value = metaElement.getAttribute(VALUE_ATTRIBUTE);
-          	 //就是一个key, value的载体，无他
-			BeanMetadataAttribute attribute = new BeanMetadataAttribute(key, value);
-          	 //sourceExtractor默认是NullSourceExtractor，返回的是空
-			attribute.setSource(extractSource(metaElement));
-			attributeAccessor.addMetadataAttribute(attribute);
-		}
-	}
+    NodeList nl = ele.getChildNodes();
+    for (int i = 0; i < nl.getLength(); i++) {
+        Node node = nl.item(i);
+        if (isCandidateElement(node) && nodeNameEquals(node, META_ELEMENT)) {
+            Element metaElement = (Element) node;
+            String key = metaElement.getAttribute(KEY_ATTRIBUTE);
+            String value = metaElement.getAttribute(VALUE_ATTRIBUTE);
+             //就是一个key, value的载体，无他
+            BeanMetadataAttribute attribute = new BeanMetadataAttribute(key, value);
+             //sourceExtractor默认是NullSourceExtractor，返回的是空
+            attribute.setSource(extractSource(metaElement));
+            attributeAccessor.addMetadataAttribute(attribute);
+        }
+    }
 }
 ```
 
@@ -1174,9 +1174,9 @@ replace-mothod解析:
 ```xml
 <bean name="replacer" class="springroad.deomo.chap4.MethodReplace" />  
 <bean name="testBean" class="springroad.deomo.chap4.LookupMethodBean">
-	<replaced-method name="test" replacer="replacer">
-  		<arg-type match="String" />
-  	</replaced-method>  
+    <replaced-method name="test" replacer="replacer">
+        <arg-type match="String" />
+    </replaced-method>  
 </bean> 
 ```
 
@@ -1190,9 +1190,9 @@ arg-type的作用是指定替换方法的参数类型，因为接口的定义参
 
 ```xml
 <bean class="base.SimpleBean">
-	<constructor-arg>
-  		<value type="java.lang.String">Cat</value>
-	</constructor-arg>
+    <constructor-arg>
+        <value type="java.lang.String">Cat</value>
+    </constructor-arg>
 </bean>
 ```
 
@@ -1204,7 +1204,7 @@ property解析:
 
 ```xml
 <bean class="base.SimpleBean">
-	<property name="name" value="skywalker" />
+    <property name="name" value="skywalker" />
 </bean>
 ```
 
@@ -1216,14 +1216,14 @@ qualifier解析:
 
 ```xml
 <bean class="base.Student">
-	<property name="name" value="skywalker"></property>
-	<property name="age" value="12"></property>
-  	<qualifier type="org.springframework.beans.factory.annotation.Qualifier" value="student" />
+    <property name="name" value="skywalker"></property>
+    <property name="age" value="12"></property>
+    <qualifier type="org.springframework.beans.factory.annotation.Qualifier" value="student" />
 </bean>	
 <bean class="base.Student">
-	<property name="name" value="seaswalker"></property>
-	<property name="age" value="15"></property>
-	<qualifier value="student_2"></qualifier>
+    <property name="name" value="seaswalker"></property>
+    <property name="age" value="15"></property>
+    <qualifier value="student_2"></qualifier>
 </bean>
 <bean class="base.SimpleBean" />
 ```
@@ -1240,7 +1240,7 @@ private Student student;
 
 ```xml
 <qualifier type="org.springframework.beans.factory.annotation.Qualifier" value="student">
-	<attribute key="id" value="1"/>
+    <attribute key="id" value="1"/>
 </qualifier>
 ```
 
@@ -1252,7 +1252,7 @@ private Student student;
 
 ```xml
 <bean class="base.Student" primary="true">
-	<context:property-override />
+    <context:property-override />
 </bean>
 ```
 
@@ -1264,17 +1264,17 @@ BeanDefinitionReaderUtils.registerBeanDefinition:
 
 ```java
 public static void registerBeanDefinition(
-	BeanDefinitionHolder definitionHolder, BeanDefinitionRegistry registry) {
-	// Register bean definition under primary name.
-	String beanName = definitionHolder.getBeanName();
-	registry.registerBeanDefinition(beanName, definitionHolder.getBeanDefinition());
-	// Register aliases for bean name, if any.
-	String[] aliases = definitionHolder.getAliases();
-	if (aliases != null) {
-		for (String alias : aliases) {
-			registry.registerAlias(beanName, alias);
-		}
-	}
+    BeanDefinitionHolder definitionHolder, BeanDefinitionRegistry registry) {
+    // Register bean definition under primary name.
+    String beanName = definitionHolder.getBeanName();
+    registry.registerBeanDefinition(beanName, definitionHolder.getBeanDefinition());
+    // Register aliases for bean name, if any.
+    String[] aliases = definitionHolder.getAliases();
+    if (aliases != null) {
+        for (String alias : aliases) {
+            registry.registerAlias(beanName, alias);
+        }
+    }
 }
 ```
 
@@ -1283,8 +1283,8 @@ registry其实就是DefaultListableBeanFactory对象，registerBeanDefinition方
 ```java
 @Override
 public void registerBeanDefinition(String beanName, BeanDefinition beanDefinition) {
-	this.beanDefinitionMap.put(beanName, beanDefinition);
-	this.beanDefinitionNames.add(beanName);
+    this.beanDefinitionMap.put(beanName, beanDefinition);
+    this.beanDefinitionNames.add(beanName);
 }
 ```
 
@@ -1310,9 +1310,9 @@ beans元素的嵌套直接递归调用DefaultBeanDefinitionDocumentReader.parseB
 
 ```java
 public BeanDefinition parseCustomElement(Element ele, BeanDefinition containingBd) {
-	String namespaceUri = getNamespaceURI(ele);
-	NamespaceHandler handler = this.readerContext.getNamespaceHandlerResolver().resolve(namespaceUri);
-	return handler.parse(ele, new ParserContext(this.readerContext, this, containingBd));
+    String namespaceUri = getNamespaceURI(ele);
+    NamespaceHandler handler = this.readerContext.getNamespaceHandlerResolver().resolve(namespaceUri);
+    return handler.parse(ele, new ParserContext(this.readerContext, this, containingBd));
 }
 ```
 
@@ -1323,20 +1323,20 @@ NamespaceHandlerResolver由XmlBeanDefinitionReader初始化，是一个DefaultNa
 ```java
 @Override
 public NamespaceHandler resolve(String namespaceUri) {
-	Map<String, Object> handlerMappings = getHandlerMappings();
-	Object handlerOrClassName = handlerMappings.get(namespaceUri);
-	if (handlerOrClassName == null) {
-		return null;
-	} else if (handlerOrClassName instanceof NamespaceHandler) {
-		return (NamespaceHandler) handlerOrClassName;
-	} else {
-		String className = (String) handlerOrClassName;
-		Class<?> handlerClass = ClassUtils.forName(className, this.classLoader);
-		NamespaceHandler namespaceHandler = (NamespaceHandler) BeanUtils.instantiateClass(handlerClass);
-		namespaceHandler.init();
-		handlerMappings.put(namespaceUri, namespaceHandler);
-		return namespaceHandler;
-	}
+    Map<String, Object> handlerMappings = getHandlerMappings();
+    Object handlerOrClassName = handlerMappings.get(namespaceUri);
+    if (handlerOrClassName == null) {
+        return null;
+    } else if (handlerOrClassName instanceof NamespaceHandler) {
+        return (NamespaceHandler) handlerOrClassName;
+    } else {
+        String className = (String) handlerOrClassName;
+        Class<?> handlerClass = ClassUtils.forName(className, this.classLoader);
+        NamespaceHandler namespaceHandler = (NamespaceHandler) BeanUtils.instantiateClass(handlerClass);
+        namespaceHandler.init();
+        handlerMappings.put(namespaceUri, namespaceHandler);
+        return namespaceHandler;
+    }
 }
 ```
 
@@ -1422,11 +1422,11 @@ BeanFactory也暴露了registerCustomEditors方法用以添加自定义的转换
 
   ```xml
   <bean class="org.springframework.beans.factory.config.CustomEditorConfigurer">
-  	<property name="customEditors">
-    		<map>
-    			<entry key="base.Cat" value="base.CatEditor" /> 
-  		</map>
-  	</property>
+    <property name="customEditors">
+            <map>
+                <entry key="base.Cat" value="base.CatEditor" /> 
+        </map>
+    </property>
   </bean>
   ```
 
@@ -1444,15 +1444,15 @@ ApplicationContextAwareProcessor核心的invokeAwareInterfaces方法:
 
 ```java
 private void invokeAwareInterfaces(Object bean) {
-	if (bean instanceof Aware) {
-		if (bean instanceof EnvironmentAware) {
-			((EnvironmentAware) bean).setEnvironment(this.applicationContext.getEnvironment());
-		}
-    	if (bean instanceof EmbeddedValueResolverAware) {
-			((EmbeddedValueResolverAware) bean).setEmbeddedValueResolver(this.embeddedValueResolver);
-		}
-      	//....
-	}
+    if (bean instanceof Aware) {
+        if (bean instanceof EnvironmentAware) {
+            ((EnvironmentAware) bean).setEnvironment(this.applicationContext.getEnvironment());
+        }
+        if (bean instanceof EmbeddedValueResolverAware) {
+            ((EmbeddedValueResolverAware) bean).setEmbeddedValueResolver(this.embeddedValueResolver);
+        }
+        //....
+    }
 }
 ```
 
@@ -1487,9 +1487,9 @@ beanFactory.registerResolvableDependency(ApplicationContext.class, this);
 
 ```java
 if (beanFactory.containsBean(LOAD_TIME_WEAVER_BEAN_NAME)) {
-	beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor(beanFactory));
-	// Set a temporary ClassLoader for type matching.
-	beanFactory.setTempClassLoader(new ContextTypeMatchClassLoader(beanFactory.getBeanClassLoader()));
+    beanFactory.addBeanPostProcessor(new LoadTimeWeaverAwareProcessor(beanFactory));
+    // Set a temporary ClassLoader for type matching.
+    beanFactory.setTempClassLoader(new ContextTypeMatchClassLoader(beanFactory.getBeanClassLoader()));
 }
 ```
 
@@ -1501,14 +1501,14 @@ if (beanFactory.containsBean(LOAD_TIME_WEAVER_BEAN_NAME)) {
 
 ```java
 if (!beanFactory.containsLocalBean(ENVIRONMENT_BEAN_NAME)) {
-	beanFactory.registerSingleton(ENVIRONMENT_BEAN_NAME, getEnvironment());
+    beanFactory.registerSingleton(ENVIRONMENT_BEAN_NAME, getEnvironment());
 }
 if (!beanFactory.containsLocalBean(SYSTEM_PROPERTIES_BEAN_NAME)) {
-	beanFactory.registerSingleton(SYSTEM_PROPERTIES_BEAN_NAME, getEnvironment().getSystemProperties());
+    beanFactory.registerSingleton(SYSTEM_PROPERTIES_BEAN_NAME, getEnvironment().getSystemProperties());
 }
 if (!beanFactory.containsLocalBean(SYSTEM_ENVIRONMENT_BEAN_NAME)) {
-	beanFactory.registerSingleton(SYSTEM_ENVIRONMENT_BEAN_NAME, getEnvironment().
-		getSystemEnvironment());
+    beanFactory.registerSingleton(SYSTEM_ENVIRONMENT_BEAN_NAME, getEnvironment().
+        getSystemEnvironment());
 }
 ```
 
@@ -1546,8 +1546,8 @@ void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory);
 
 ```java
 protected void invokeBeanFactoryPostProcessors(ConfigurableListableBeanFactory beanFactory) {
-	PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(beanFactory,
-		getBeanFactoryPostProcessors());
+    PostProcessorRegistrationDelegate.invokeBeanFactoryPostProcessors(beanFactory,
+        getBeanFactoryPostProcessors());
 }
 ```
 
@@ -1620,7 +1620,7 @@ AbstractApplicationContext.publishEvent核心代码:
 
 ```java
 protected void publishEvent(Object event, ResolvableType eventType) {
-	getApplicationEventMulticaster().multicastEvent(applicationEvent, eventType);
+    getApplicationEventMulticaster().multicastEvent(applicationEvent, eventType);
 }
 ```
 
@@ -1629,20 +1629,20 @@ SimpleApplicationEventMulticaster.multicastEvent:
 ```java
 @Override
 public void multicastEvent(final ApplicationEvent event, ResolvableType eventType) {
-	ResolvableType type = (eventType != null ? eventType : resolveDefaultEventType(event));
-	for (final ApplicationListener<?> listener : getApplicationListeners(event, type)) {
-		Executor executor = getTaskExecutor();
-		if (executor != null) {
-			executor.execute(new Runnable() {
-				@Override
-				public void run() {
-					invokeListener(listener, event);
-				}
-			});
-		} else {
-			invokeListener(listener, event);
-		}
-	}
+    ResolvableType type = (eventType != null ? eventType : resolveDefaultEventType(event));
+    for (final ApplicationListener<?> listener : getApplicationListeners(event, type)) {
+        Executor executor = getTaskExecutor();
+        if (executor != null) {
+            executor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    invokeListener(listener, event);
+                }
+            });
+        } else {
+            invokeListener(listener, event);
+        }
+    }
 }
 ```
 
@@ -1659,7 +1659,7 @@ public void multicastEvent(final ApplicationEvent event, ResolvableType eventTyp
 ```xml
 <task:executor id="multicasterExecutor" pool-size="3"/>
 <bean class="org.springframework.context.event.SimpleApplicationEventMulticaster">
-	<property name="taskExecutor" ref="multicasterExecutor"></property>
+    <property name="taskExecutor" ref="multicasterExecutor"></property>
 </bean>
 ```
 
@@ -1716,28 +1716,28 @@ finishBeanFactoryInitialization：
 
 ```java
 protected void finishBeanFactoryInitialization(ConfigurableListableBeanFactory beanFactory) {
-	if (beanFactory.containsBean(CONVERSION_SERVICE_BEAN_NAME) &&
-			beanFactory.isTypeMatch(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class)) {
-		beanFactory.setConversionService(
-				beanFactory.getBean(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class));
-	}
-	if (!beanFactory.hasEmbeddedValueResolver()) {
-		beanFactory.addEmbeddedValueResolver(new StringValueResolver() {
-			@Override
-			public String resolveStringValue(String strVal) {
-				return getEnvironment().resolvePlaceholders(strVal);
-			}
-		});
-	}
-	String[] weaverAwareNames = beanFactory.getBeanNamesForType
-		(LoadTimeWeaverAware.class, false, false);
-	for (String weaverAwareName : weaverAwareNames) {
-		getBean(weaverAwareName);
-	}
-	// Allow for caching all bean definition metadata, not expecting further changes.
-	beanFactory.freezeConfiguration();
-	// Instantiate all remaining (non-lazy-init) singletons.
-	beanFactory.preInstantiateSingletons();
+    if (beanFactory.containsBean(CONVERSION_SERVICE_BEAN_NAME) &&
+            beanFactory.isTypeMatch(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class)) {
+        beanFactory.setConversionService(
+                beanFactory.getBean(CONVERSION_SERVICE_BEAN_NAME, ConversionService.class));
+    }
+    if (!beanFactory.hasEmbeddedValueResolver()) {
+        beanFactory.addEmbeddedValueResolver(new StringValueResolver() {
+            @Override
+            public String resolveStringValue(String strVal) {
+                return getEnvironment().resolvePlaceholders(strVal);
+            }
+        });
+    }
+    String[] weaverAwareNames = beanFactory.getBeanNamesForType
+        (LoadTimeWeaverAware.class, false, false);
+    for (String weaverAwareName : weaverAwareNames) {
+        getBean(weaverAwareName);
+    }
+    // Allow for caching all bean definition metadata, not expecting further changes.
+    beanFactory.freezeConfiguration();
+    // Instantiate all remaining (non-lazy-init) singletons.
+    beanFactory.preInstantiateSingletons();
 }
 ```
 
@@ -1770,56 +1770,56 @@ DefaultListableBeanFactory.preInstantiateSingletons:
 ```java
 @Override
 public void preInstantiateSingletons() throws BeansException {
-	List<String> beanNames = new ArrayList<String>(this.beanDefinitionNames);
-	for (String beanName : beanNames) {
-		RootBeanDefinition bd = getMergedLocalBeanDefinition(beanName);
-		if (!bd.isAbstract() && bd.isSingleton() && !bd.isLazyInit()) {
-			if (isFactoryBean(beanName)) {
-				final FactoryBean<?> factory = (FactoryBean<?>) getBean(FACTORY_BEAN_PREFIX 
-					+ beanName);
-				boolean isEagerInit;
-				if (System.getSecurityManager() != null && factory instanceof SmartFactoryBean) {
-					isEagerInit = AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
-						@Override
-						public Boolean run() {
-							return ((SmartFactoryBean<?>) factory).isEagerInit();
-						}
-					}, getAccessControlContext());
-				}
-				else {
-					isEagerInit = (factory instanceof SmartFactoryBean &&
-							((SmartFactoryBean<?>) factory).isEagerInit());
-				}
-				if (isEagerInit) {
-					getBean(beanName);
-				}
-			}
-			else {
-				getBean(beanName);
-			}
-		}
-	}
+    List<String> beanNames = new ArrayList<String>(this.beanDefinitionNames);
+    for (String beanName : beanNames) {
+        RootBeanDefinition bd = getMergedLocalBeanDefinition(beanName);
+        if (!bd.isAbstract() && bd.isSingleton() && !bd.isLazyInit()) {
+            if (isFactoryBean(beanName)) {
+                final FactoryBean<?> factory = (FactoryBean<?>) getBean(FACTORY_BEAN_PREFIX 
+                    + beanName);
+                boolean isEagerInit;
+                if (System.getSecurityManager() != null && factory instanceof SmartFactoryBean) {
+                    isEagerInit = AccessController.doPrivileged(new PrivilegedAction<Boolean>() {
+                        @Override
+                        public Boolean run() {
+                            return ((SmartFactoryBean<?>) factory).isEagerInit();
+                        }
+                    }, getAccessControlContext());
+                }
+                else {
+                    isEagerInit = (factory instanceof SmartFactoryBean &&
+                            ((SmartFactoryBean<?>) factory).isEagerInit());
+                }
+                if (isEagerInit) {
+                    getBean(beanName);
+                }
+            }
+            else {
+                getBean(beanName);
+            }
+        }
+    }
 
-	// Trigger post-initialization callback for all applicable beans...
-	for (String beanName : beanNames) {
-		Object singletonInstance = getSingleton(beanName);
-		if (singletonInstance instanceof SmartInitializingSingleton) {
-			final SmartInitializingSingleton smartSingleton = 
-				(SmartInitializingSingleton) singletonInstance;
-			if (System.getSecurityManager() != null) {
-				AccessController.doPrivileged(new PrivilegedAction<Object>() {
-					@Override
-					public Object run() {
-						smartSingleton.afterSingletonsInstantiated();
-						return null;
-					}
-				}, getAccessControlContext());
-			}
-			else {
-				smartSingleton.afterSingletonsInstantiated();
-			}
-		}
-	}
+    // Trigger post-initialization callback for all applicable beans...
+    for (String beanName : beanNames) {
+        Object singletonInstance = getSingleton(beanName);
+        if (singletonInstance instanceof SmartInitializingSingleton) {
+            final SmartInitializingSingleton smartSingleton = 
+                (SmartInitializingSingleton) singletonInstance;
+            if (System.getSecurityManager() != null) {
+                AccessController.doPrivileged(new PrivilegedAction<Object>() {
+                    @Override
+                    public Object run() {
+                        smartSingleton.afterSingletonsInstantiated();
+                        return null;
+                    }
+                }, getAccessControlContext());
+            }
+            else {
+                smartSingleton.afterSingletonsInstantiated();
+            }
+        }
+    }
 }
 ```
 
@@ -1832,7 +1832,7 @@ public void preInstantiateSingletons() throws BeansException {
 ```java
 @Override
 public Object getBean(String name) throws BeansException {
-	return doGetBean(name, null, null, false);
+    return doGetBean(name, null, null, false);
 }
 ```
 
@@ -1853,7 +1853,7 @@ final String beanName = transformedBeanName(name);
 ```java
 Object sharedInstance = getSingleton(beanName);
 if (sharedInstance != null && args == null) {
-	bean = getObjectForBeanInstance(sharedInstance, name, beanName, null);
+    bean = getObjectForBeanInstance(sharedInstance, name, beanName, null);
 }
 ```
 
@@ -1864,16 +1864,16 @@ if (sharedInstance != null && args == null) {
 ```java
 BeanFactory parentBeanFactory = getParentBeanFactory();
 if (parentBeanFactory != null && !containsBeanDefinition(beanName)) {
-	// Not found -> check parent.
-  	//此方法其实是做了前面beanName转化的逆操作，因为父容器同样会进行转化操作
-	String nameToLookup = originalBeanName(name);
-	if (args != null) {
-		// Delegation to parent with explicit args.
-		return (T) parentBeanFactory.getBean(nameToLookup, args);
-	} else {
-		// No args -> delegate to standard getBean method.
-		return parentBeanFactory.getBean(nameToLookup, requiredType);
-	}
+    // Not found -> check parent.
+    //此方法其实是做了前面beanName转化的逆操作，因为父容器同样会进行转化操作
+    String nameToLookup = originalBeanName(name);
+    if (args != null) {
+        // Delegation to parent with explicit args.
+        return (T) parentBeanFactory.getBean(nameToLookup, args);
+    } else {
+        // No args -> delegate to standard getBean method.
+        return parentBeanFactory.getBean(nameToLookup, requiredType);
+    }
 }
 ```
 
@@ -1884,15 +1884,15 @@ bean可以由depends-on属性配置依赖的bean。Spring会首先初始化依�
 ```java
 String[] dependsOn = mbd.getDependsOn();
 if (dependsOn != null) {
-	for (String dependsOnBean : dependsOn) {
-      	 //检测是否存在循环依赖
-		if (isDependent(beanName, dependsOnBean)) {
-			throw new BeanCreationException(mbd.getResourceDescription(), beanName,
-			"Circular depends-on relationship between '" + beanName + "' and '" + dependsOnBean + "'");
-		}
-		registerDependentBean(dependsOnBean, beanName);
-		getBean(dependsOnBean);
-	}
+    for (String dependsOnBean : dependsOn) {
+         //检测是否存在循环依赖
+        if (isDependent(beanName, dependsOnBean)) {
+            throw new BeanCreationException(mbd.getResourceDescription(), beanName,
+            "Circular depends-on relationship between '" + beanName + "' and '" + dependsOnBean + "'");
+        }
+        registerDependentBean(dependsOnBean, beanName);
+        getBean(dependsOnBean);
+    }
 }
 ```
 
@@ -1904,13 +1904,13 @@ registerDependentBean进行了依赖关系的注册，这么做的原因是Sprin
 
 ```java
 if (mbd.isSingleton()) {
-	sharedInstance = getSingleton(beanName, new ObjectFactory<Object>() {
-		@Override
-		public Object getObject() throws BeansException {
-			return createBean(beanName, mbd, args);
-		}
-	});
-	bean = getObjectForBeanInstance(sharedInstance, name, beanName, mbd);
+    sharedInstance = getSingleton(beanName, new ObjectFactory<Object>() {
+        @Override
+        public Object getObject() throws BeansException {
+            return createBean(beanName, mbd, args);
+        }
+    });
+    bean = getObjectForBeanInstance(sharedInstance, name, beanName, mbd);
 }
 ```
 
@@ -1922,7 +1922,7 @@ if (mbd.isSingleton()) {
 
 ```java
 synchronized (this.singletonObjects) {
-	Object singletonObject = this.singletonObjects.get(beanName);
+    Object singletonObject = this.singletonObjects.get(beanName);
 }
 ```
 
@@ -1945,16 +1945,16 @@ prepareMethodOverrides:
 
 ```java
 public void prepareMethodOverrides() throws BeanDefinitionValidationException {
-	// Check that lookup methods exists.
-	MethodOverrides methodOverrides = getMethodOverrides();
-	if (!methodOverrides.isEmpty()) {
-		Set<MethodOverride> overrides = methodOverrides.getOverrides();
-		synchronized (overrides) {
-			for (MethodOverride mo : overrides) {
-				prepareMethodOverride(mo);
-			}
-		}
-	}
+    // Check that lookup methods exists.
+    MethodOverrides methodOverrides = getMethodOverrides();
+    if (!methodOverrides.isEmpty()) {
+        Set<MethodOverride> overrides = methodOverrides.getOverrides();
+        synchronized (overrides) {
+            for (MethodOverride mo : overrides) {
+                prepareMethodOverride(mo);
+            }
+        }
+    }
 }
 ```
 
@@ -1962,15 +1962,15 @@ prepareMethodOverride:
 
 ```java
 protected void prepareMethodOverride(MethodOverride mo)  {
-	int count = ClassUtils.getMethodCountForName(getBeanClass(), mo.getMethodName());
-	if (count == 0) {
-		throw new BeanDefinitionValidationException(
-				"Invalid method override: no method with name '" + mo.getMethodName() +
-				"' on class [" + getBeanClassName() + "]");
-	} else if (count == 1) {
-		// Mark override as not overloaded, to avoid the overhead of arg type checking.
-		mo.setOverloaded(false);
-	}
+    int count = ClassUtils.getMethodCountForName(getBeanClass(), mo.getMethodName());
+    if (count == 0) {
+        throw new BeanDefinitionValidationException(
+                "Invalid method override: no method with name '" + mo.getMethodName() +
+                "' on class [" + getBeanClassName() + "]");
+    } else if (count == 1) {
+        // Mark override as not overloaded, to avoid the overhead of arg type checking.
+        mo.setOverloaded(false);
+    }
 }
 ```
 
@@ -1981,7 +1981,7 @@ protected void prepareMethodOverride(MethodOverride mo)  {
 ```java
 Object bean = resolveBeforeInstantiation(beanName, mbdToUse);
 if (bean != null) {
-	return bean;
+    return bean;
 }
 Object beanInstance = doCreateBean(beanName, mbdToUse, args);
 return beanInstance;
@@ -1991,21 +1991,21 @@ return beanInstance;
 
 ```java
 protected Object resolveBeforeInstantiation(String beanName, RootBeanDefinition mbd) {
-	Object bean = null;
-	if (!Boolean.FALSE.equals(mbd.beforeInstantiationResolved)) {
-		// Make sure bean class is actually resolved at this point.
-		if (!mbd.isSynthetic() && hasInstantiationAwareBeanPostProcessors()) {
-			Class<?> targetType = determineTargetType(beanName, mbd);
-			if (targetType != null) {
-				bean = applyBeanPostProcessorsBeforeInstantiation(targetType, beanName);
-				if (bean != null) {
-					bean = applyBeanPostProcessorsAfterInitialization(bean, beanName);
-				}
-			}
-		}
-		mbd.beforeInstantiationResolved = (bean != null);
-	}
-	return bean;
+    Object bean = null;
+    if (!Boolean.FALSE.equals(mbd.beforeInstantiationResolved)) {
+        // Make sure bean class is actually resolved at this point.
+        if (!mbd.isSynthetic() && hasInstantiationAwareBeanPostProcessors()) {
+            Class<?> targetType = determineTargetType(beanName, mbd);
+            if (targetType != null) {
+                bean = applyBeanPostProcessorsBeforeInstantiation(targetType, beanName);
+                if (bean != null) {
+                    bean = applyBeanPostProcessorsAfterInitialization(bean, beanName);
+                }
+            }
+        }
+        mbd.beforeInstantiationResolved = (bean != null);
+    }
+    return bean;
 }
 ```
 
@@ -2022,7 +2022,7 @@ protected Object resolveBeforeInstantiation(String beanName, RootBeanDefinition 
 ```java
 BeanWrapper instanceWrapper = null;
 if (instanceWrapper == null) {
-	instanceWrapper = createBeanInstance(beanName, mbd, args);
+    instanceWrapper = createBeanInstance(beanName, mbd, args);
 }
 ```
 
@@ -2034,8 +2034,8 @@ createBeanInstance的创建过程又分为以下几种情况:
 
   ```java
   protected BeanWrapper instantiateUsingFactoryMethod(
-  	String beanName, RootBeanDefinition mbd, Object[] explicitArgs) {
-  	return new ConstructorResolver(this).instantiateUsingFactoryMethod(beanName, mbd, explicitArgs);
+    String beanName, RootBeanDefinition mbd, Object[] explicitArgs) {
+    return new ConstructorResolver(this).instantiateUsingFactoryMethod(beanName, mbd, explicitArgs);
   }
   ```
 
@@ -2055,7 +2055,7 @@ createBeanInstance的创建过程又分为以下几种情况:
 
     ```java
     beanInstance = this.beanFactory.getInstantiationStrategy().instantiate(
-    	mbd, beanName, this.beanFactory, factoryBean, factoryMethodToUse, argsToUse);
+        mbd, beanName, this.beanFactory, factoryBean, factoryMethodToUse, argsToUse);
     ```
 
     getInstantiationStrategy返回的是CglibSubclassingInstantiationStrategy对象。此处instantiate实现也很简单，就是调用工厂方法的Method对象反射调用其invoke即可得到对象，SimpleInstantiationStrategy.
@@ -2065,8 +2065,8 @@ createBeanInstance的创建过程又分为以下几种情况:
     ```java
     @Override
     public Object instantiate(RootBeanDefinition bd, String beanName, BeanFactory owner,
-    	Object factoryBean, final Method factoryMethod, Object... args) {
-    	return factoryMethod.invoke(factoryBean, args);
+        Object factoryBean, final Method factoryMethod, Object... args) {
+        return factoryMethod.invoke(factoryBean, args);
     }
     ```
 
@@ -2078,10 +2078,10 @@ createBeanInstance的创建过程又分为以下几种情况:
   // Need to determine the constructor...
   Constructor<?>[] ctors = determineConstructorsFromBeanPostProcessors(beanClass, beanName);
   if (ctors != null ||
-  	mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_CONSTRUCTOR ||
+    mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_CONSTRUCTOR ||
       //配置了<constructor-arg>子元素
-  	mbd.hasConstructorArgumentValues() || !ObjectUtils.isEmpty(args))  {
-  	return autowireConstructor(beanName, mbd, ctors, args);
+    mbd.hasConstructorArgumentValues() || !ObjectUtils.isEmpty(args))  {
+    return autowireConstructor(beanName, mbd, ctors, args);
   }
   ```
 
@@ -2089,19 +2089,19 @@ createBeanInstance的创建过程又分为以下几种情况:
 
   ```java
   protected Constructor<?>[] determineConstructorsFromBeanPostProcessors(Class<?> beanClass, String beanName) {
-  	if (beanClass != null && hasInstantiationAwareBeanPostProcessors()) {
-  		for (BeanPostProcessor bp : getBeanPostProcessors()) {
-  			if (bp instanceof SmartInstantiationAwareBeanPostProcessor) {
-  				SmartInstantiationAwareBeanPostProcessor ibp = 
-  					(SmartInstantiationAwareBeanPostProcessor) bp;
-  				Constructor<?>[] ctors = ibp.determineCandidateConstructors(beanClass, beanName);
-  				if (ctors != null) {
-  					return ctors;
-  				}
-  			}
-  		}
-  	}
-  	return null;
+    if (beanClass != null && hasInstantiationAwareBeanPostProcessors()) {
+        for (BeanPostProcessor bp : getBeanPostProcessors()) {
+            if (bp instanceof SmartInstantiationAwareBeanPostProcessor) {
+                SmartInstantiationAwareBeanPostProcessor ibp = 
+                    (SmartInstantiationAwareBeanPostProcessor) bp;
+                Constructor<?>[] ctors = ibp.determineCandidateConstructors(beanClass, beanName);
+                if (ctors != null) {
+                    return ctors;
+                }
+            }
+        }
+    }
+    return null;
   }
   ```
 
@@ -2133,11 +2133,11 @@ createBeanInstance的创建过程又分为以下几种情况:
 
     ```java
     protected Object resolveAutowiredArgument(
-    		MethodParameter param, String beanName, Set<String> autowiredBeanNames, 
-    		TypeConverter typeConverter) {
-    	return this.beanFactory.resolveDependency(
-    			new DependencyDescriptor(param, true), beanName, 
-    			autowiredBeanNames, typeConverter);
+            MethodParameter param, String beanName, Set<String> autowiredBeanNames, 
+            TypeConverter typeConverter) {
+        return this.beanFactory.resolveDependency(
+                new DependencyDescriptor(param, true), beanName, 
+                autowiredBeanNames, typeConverter);
     }
     ```
 
@@ -2146,13 +2146,13 @@ createBeanInstance的创建过程又分为以下几种情况:
   ```java
   @Override
   public Object instantiate(RootBeanDefinition bd, String beanName, BeanFactory owner,
-  		final Constructor<?> ctor, Object... args) {
-  	if (bd.getMethodOverrides().isEmpty()) {
-        	 //反射调用
-  		return BeanUtils.instantiateClass(ctor, args);
-  	} else {
-  		return instantiateWithMethodInjection(bd, beanName, owner, ctor, args);
-  	}
+        final Constructor<?> ctor, Object... args) {
+    if (bd.getMethodOverrides().isEmpty()) {
+             //反射调用
+        return BeanUtils.instantiateClass(ctor, args);
+    } else {
+        return instantiateWithMethodInjection(bd, beanName, owner, ctor, args);
+    }
   }
   ```
 
@@ -2163,8 +2163,8 @@ createBeanInstance的创建过程又分为以下几种情况:
   ```java
   @Override
   protected Object instantiateWithMethodInjection(RootBeanDefinition bd, String beanName, BeanFactory 	owner,Constructor<?> ctor, Object... args) {
-  	// Must generate CGLIB subclass...
-  	return new CglibSubclassCreator(bd, owner).instantiate(ctor, args);
+    // Must generate CGLIB subclass...
+    return new CglibSubclassCreator(bd, owner).instantiate(ctor, args);
   }
   ```
 
@@ -2183,10 +2183,10 @@ createBeanInstance的创建过程又分为以下几种情况:
 
 ```java
 synchronized (mbd.postProcessingLock) {
-	if (!mbd.postProcessed) {
-		applyMergedBeanDefinitionPostProcessors(mbd, beanType, beanName);
-		mbd.postProcessed = true;
-	}
+    if (!mbd.postProcessed) {
+        applyMergedBeanDefinitionPostProcessors(mbd, beanType, beanName);
+        mbd.postProcessed = true;
+    }
 }
 ```
 
@@ -2198,27 +2198,27 @@ synchronized (mbd.postProcessingLock) {
 
 ```java
 protected void populateBean(String beanName, RootBeanDefinition mbd, BeanWrapper bw) {
-  	//所有<property>的值
-	PropertyValues pvs = mbd.getPropertyValues();
+    //所有<property>的值
+    PropertyValues pvs = mbd.getPropertyValues();
 
-	if (mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_NAME ||
-			mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_TYPE) {
-		MutablePropertyValues newPvs = new MutablePropertyValues(pvs);
+    if (mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_NAME ||
+            mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_TYPE) {
+        MutablePropertyValues newPvs = new MutablePropertyValues(pvs);
 
-		// Add property values based on autowire by name if applicable.
-		if (mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_NAME) {
-			autowireByName(beanName, mbd, bw, newPvs);
-		}
+        // Add property values based on autowire by name if applicable.
+        if (mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_NAME) {
+            autowireByName(beanName, mbd, bw, newPvs);
+        }
 
-		// Add property values based on autowire by type if applicable.
-		if (mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_TYPE) {
-			autowireByType(beanName, mbd, bw, newPvs);
-		}
+        // Add property values based on autowire by type if applicable.
+        if (mbd.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIRE_BY_TYPE) {
+            autowireByType(beanName, mbd, bw, newPvs);
+        }
 
-		pvs = newPvs;
-	}
-	//设值
-	applyPropertyValues(beanName, mbd, bw, pvs);
+        pvs = newPvs;
+    }
+    //设值
+    applyPropertyValues(beanName, mbd, bw, pvs);
 }
 ```
 
@@ -2226,17 +2226,17 @@ autowireByName源码:
 
 ```java
 protected void autowireByName(
-		String beanName, AbstractBeanDefinition mbd, BeanWrapper bw, MutablePropertyValues pvs) {
-  	//返回所有引用(ref="XXX")的bean名称
-	String[] propertyNames = unsatisfiedNonSimpleProperties(mbd, bw);
-	for (String propertyName : propertyNames) {
-		if (containsBean(propertyName)) {
-          	 //从BeanFactory获取
-			Object bean = getBean(propertyName);
-			pvs.add(propertyName, bean);
-			registerDependentBean(propertyName, beanName);
-		}
-	}
+        String beanName, AbstractBeanDefinition mbd, BeanWrapper bw, MutablePropertyValues pvs) {
+    //返回所有引用(ref="XXX")的bean名称
+    String[] propertyNames = unsatisfiedNonSimpleProperties(mbd, bw);
+    for (String propertyName : propertyNames) {
+        if (containsBean(propertyName)) {
+             //从BeanFactory获取
+            Object bean = getBean(propertyName);
+            pvs.add(propertyName, bean);
+            registerDependentBean(propertyName, beanName);
+        }
+    }
 }
 ```
 
@@ -2254,10 +2254,10 @@ Spring判断一个属性可不可以被设置(存不存在)是通过java bean的
 // Initialize the bean instance.
 Object exposedObject = bean;
 try {
-	populateBean(beanName, mbd, instanceWrapper);
-	if (exposedObject != null) {
-		exposedObject = initializeBean(beanName, exposedObject, mbd);
-	}
+    populateBean(beanName, mbd, instanceWrapper);
+    if (exposedObject != null) {
+        exposedObject = initializeBean(beanName, exposedObject, mbd);
+    }
 }
 ```
 
@@ -2265,30 +2265,30 @@ initializeBean:
 
 ```java
 protected Object initializeBean(final String beanName, final Object bean, RootBeanDefinition mbd) {
-	if (System.getSecurityManager() != null) {
-		AccessController.doPrivileged(new PrivilegedAction<Object>() {
-			@Override
-			public Object run() {
-				invokeAwareMethods(beanName, bean);
-				return null;
-			}
-		}, getAccessControlContext());
-	}
-	else {
-		invokeAwareMethods(beanName, bean);
-	}
+    if (System.getSecurityManager() != null) {
+        AccessController.doPrivileged(new PrivilegedAction<Object>() {
+            @Override
+            public Object run() {
+                invokeAwareMethods(beanName, bean);
+                return null;
+            }
+        }, getAccessControlContext());
+    }
+    else {
+        invokeAwareMethods(beanName, bean);
+    }
 
-	Object wrappedBean = bean;
-	if (mbd == null || !mbd.isSynthetic()) {
-		wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, beanName);
-	}
+    Object wrappedBean = bean;
+    if (mbd == null || !mbd.isSynthetic()) {
+        wrappedBean = applyBeanPostProcessorsBeforeInitialization(wrappedBean, beanName);
+    }
 
-	invokeInitMethods(beanName, wrappedBean, mbd);
+    invokeInitMethods(beanName, wrappedBean, mbd);
 
-	if (mbd == null || !mbd.isSynthetic()) {
-		wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
-	}
-	return wrappedBean;
+    if (mbd == null || !mbd.isSynthetic()) {
+        wrappedBean = applyBeanPostProcessorsAfterInitialization(wrappedBean, beanName);
+    }
+    return wrappedBean;
 }
 ```
 
@@ -2300,17 +2300,17 @@ protected Object initializeBean(final String beanName, final Object bean, RootBe
 
   ```java
   private void invokeAwareMethods(final String beanName, final Object bean) {
-  	if (bean instanceof Aware) {
-  		if (bean instanceof BeanNameAware) {
-  			((BeanNameAware) bean).setBeanName(beanName);
-  		}
-  		if (bean instanceof BeanClassLoaderAware) {
-  			((BeanClassLoaderAware) bean).setBeanClassLoader(getBeanClassLoader());
-  		}
-  		if (bean instanceof BeanFactoryAware) {
-  			((BeanFactoryAware) bean).setBeanFactory(AbstractAutowireCapableBeanFactory.this);
-  		}
-  	}
+    if (bean instanceof Aware) {
+        if (bean instanceof BeanNameAware) {
+            ((BeanNameAware) bean).setBeanName(beanName);
+        }
+        if (bean instanceof BeanClassLoaderAware) {
+            ((BeanClassLoaderAware) bean).setBeanClassLoader(getBeanClassLoader());
+        }
+        if (bean instanceof BeanFactoryAware) {
+            ((BeanFactoryAware) bean).setBeanFactory(AbstractAutowireCapableBeanFactory.this);
+        }
+    }
   }
   ```
 
@@ -2338,16 +2338,16 @@ AbstractBeanFactory.doGetBean相关源码:
 
 ```java
 else if (mbd.isPrototype()) {
-	// It's a prototype -> create a new instance.
-	Object prototypeInstance = null;
-	try {
-		beforePrototypeCreation(beanName);
-		prototypeInstance = createBean(beanName, mbd, args);
-	}
-	finally {
-		afterPrototypeCreation(beanName);
-	}
-	bean = getObjectForBeanInstance(prototypeInstance, name, beanName, mbd);
+    // It's a prototype -> create a new instance.
+    Object prototypeInstance = null;
+    try {
+        beforePrototypeCreation(beanName);
+        prototypeInstance = createBean(beanName, mbd, args);
+    }
+    finally {
+        afterPrototypeCreation(beanName);
+    }
+    bean = getObjectForBeanInstance(prototypeInstance, name, beanName, mbd);
 }
 ```
 
@@ -2373,24 +2373,24 @@ else if (mbd.isPrototype()) {
 
 ```java
 else {
-	String scopeName = mbd.getScope();
-	final Scope scope = this.scopes.get(scopeName);
-	if (scope == null) {
-		throw new IllegalStateException("No Scope registered for scope name '" + scopeName + "'");
-	}
-	Object scopedInstance = scope.get(beanName, new ObjectFactory<Object>() {
-		@Override
-		public Object getObject() throws BeansException {
-			beforePrototypeCreation(beanName);
-			try {
-				return createBean(beanName, mbd, args);
-			}
-			finally {
-				afterPrototypeCreation(beanName);
-			}
-		}
-	});
-	bean = getObjectForBeanInstance(scopedInstance, name, beanName, mbd);
+    String scopeName = mbd.getScope();
+    final Scope scope = this.scopes.get(scopeName);
+    if (scope == null) {
+        throw new IllegalStateException("No Scope registered for scope name '" + scopeName + "'");
+    }
+    Object scopedInstance = scope.get(beanName, new ObjectFactory<Object>() {
+        @Override
+        public Object getObject() throws BeansException {
+            beforePrototypeCreation(beanName);
+            try {
+                return createBean(beanName, mbd, args);
+            }
+            finally {
+                afterPrototypeCreation(beanName);
+            }
+        }
+    });
+    bean = getObjectForBeanInstance(scopedInstance, name, beanName, mbd);
 }
 ```
 

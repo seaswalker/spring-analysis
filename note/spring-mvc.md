@@ -423,7 +423,7 @@ initFlashMapManager方法会向容器注册SessionFlashMapManager对象，类图
 protected void initHandlerMethods() {
     //获取容器中所有的bean
     String[] beanNames = (this.detectHandlerMethodsInAncestorContexts ?
-            BeanFactoryUtils.beanNamesForTypeIncludingAncestors(getApplicationContext(), Object.class) 			   :getApplicationContext().getBeanNamesForType(Object.class));
+            BeanFactoryUtils.beanNamesForTypeIncludingAncestors(getApplicationContext(), Object.class)             :getApplicationContext().getBeanNamesForType(Object.class));
     for (String beanName : beanNames) {
         if (!beanName.startsWith(SCOPED_TARGET_NAME_PREFIX)) {
             Class<?> beanType = null;
@@ -960,3 +960,101 @@ protected void renderMergedOutputModel(
 
 可以看出，对jsp来说，所谓的渲染其实就是**将Model中的属性设置到Request，再利用原生Servlet RequestDispatcher API进行转发的过程**。
 
+# 拾遗
+
+## @ResponseBody
+
+通常我们可以在Controller或方法上标注@ResponseBody注解以表示需要将对象转为JSON并返回给前端，那么Spring MVC是如何自动完成这一过程的呢?
+
+从前面初始化-容器初始化-容器创建-配置解析一节可以看出，Spring MVC采用org.springframework.web.servlet.config.AnnotationDrivenBeanDefinitionParser进行配置的解析，核心的parse方法中完成了对HttpMessageConverter的初始化。
+
+### HttpMessageConverter
+
+Spring的HttpMessageConverter接口负责HTTP请求-Java对象与Java对象-响应之间的转换。我们以Spring默认使用的Jackson转换器为例，类图:
+
+![HttpMessageConverter](images/HttpMessageConverter.jpg)
+
+HttpMessageConverter实现的初始化由AnnotationDrivenBeanDefinitionParser的getMessageConverters方法完成，HttpMessageConverter的来源分为自定义和默认。
+
+示例配置:
+
+```xml
+<mvc:annotation-driven>
+  <mvc:message-converters register-defaults="true">
+    <bean class="test.Converter" />
+  </mvc:message-converters>
+</mvc:annotation-driven>
+```
+
+#### 自定义
+
+Spring允许我们通过XML配置文件的message-converters元素来进行自定义。
+
+#### 默认
+
+当**检测到没有配置message-converters元素或者register-defaults="true"时Spring便会注册默认转换器**。这其中便包括MappingJacksonHttpMessageConverter，相关源码:
+
+```java
+else if (jacksonPresent) {
+    messageConverters.add(createConverterDefinition(
+        org.springframework.http.converter.json.MappingJacksonHttpMessageConverter.class, source));
+}
+```
+
+jacksonPresent声明:
+
+```java
+private static final boolean jacksonPresent =
+    ClassUtils.isPresent("org.codehaus.jackson.map.ObjectMapper", AnnotationDrivenBeanDefinitionParser.class.getClassLoader()) &&
+    ClassUtils.isPresent("org.codehaus.jackson.JsonGenerator", AnnotationDrivenBeanDefinitionParser.class.getClassLoader());
+```
+
+### 转换
+
+入口位于ServletInvocableHandlerMethod的invokeAndHandle方法对于响应的处理:
+
+```java
+this.returnValueHandlers.handleReturnValue(returnValue, getReturnValueType(returnValue), mavContainer, webRequest);
+```
+
+returnValueHandlers其实就是RequestMappingHandlerAdapter内部的returnValueHandlers，后者由RequestMappingHandlerAdapter的afterPropertiesSet方法初始化，关键在于:
+
+```java
+handlers.add(new RequestResponseBodyMethodProcessor(getMessageConverters(), this.contentNegotiationManager));
+```
+
+对象到JSON的转换正是由RequestResponseBodyMethodProcessor完成，ServletInvocableHandlerMethod通过supportsReturnType方法决定HandlerMethodReturnValueHandler是否可以处理当前返回类型或返回方法，RequestResponseBodyMethodProcessor的实现:
+
+```java
+@Override
+public boolean supportsReturnType(MethodParameter returnType) {
+    return ((AnnotationUtils.findAnnotation(returnType.getContainingClass(), ResponseBody.class) != null) ||
+        (returnType.getMethodAnnotation(ResponseBody.class) != null));
+}
+```
+
+核心的handleReturnValue方法:
+
+```java
+@Override
+public void handleReturnValue(Object returnValue, MethodParameter returnType,
+    ModelAndViewContainer mavContainer, NativeWebRequest webRequest) {
+    mavContainer.setRequestHandled(true);
+    if (returnValue != null) {
+        writeWithMessageConverters(returnValue, returnType, webRequest);
+    }
+}
+```
+
+这里其实是通过HttpMessageConverter的canRead或canWrite方法来判断给定的转换器是否合适，canWrite方法实现:
+
+```java
+@Override
+public boolean canWrite(Class<?> clazz, MediaType mediaType) {
+    return (this.objectMapper.canSerialize(clazz) && canWrite(mediaType));
+}
+```
+
+这里剩下的便是Jackson的事情了，注意MappingJacksonHttpMessageConverter中的objectMapper被所有的线程所共享，因为其是线程安全的，但是这样是否有性能问题?
+
+//TODO HandlerMethodReturnValueHandler是神马?

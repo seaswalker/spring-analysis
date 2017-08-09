@@ -1057,4 +1057,36 @@ public boolean canWrite(Class<?> clazz, MediaType mediaType) {
 
 这里剩下的便是Jackson的事情了，注意MappingJacksonHttpMessageConverter中的objectMapper被所有的线程所共享，因为其是线程安全的，但是这样是否有性能问题?
 
-//TODO HandlerMethodReturnValueHandler是神马?
+## 参数解析 & 结果转换
+
+Spring MVC中参数到各种类型的转换由HandlerMethodArgumentResolver接口完成，而Controller返回值到真正的响应的转换由HandlerMethodReturnValueHandler接口完成。两者分别负责Spring MVC中数据的输入与输出，可用下图表示:
+
+![Spring MVC输入输出转换](images/mvc_input_output.PNG)
+
+HandlerMethodArgumentResolver接口及其主要实现类如下图:
+
+![HandlerMethodArgumentResolver](images/HandlerMethodArgumentResolver_all.jpg)
+
+HandlerMethodReturnValueHandler接口以及主要实现类如下:
+
+![HandlerMethodReturnValueHandler](images/HandlerMethodReturnValueHandler_all.jpg)
+
+其实有很多类同时实现了两个接口，比如RequestResponseBodyMethodProcessor，这样的类一般以Processor结尾。
+
+两种转换器的初始化由HandlerAdapter完成，这也很好的体现了HandlerAdapter接口的功能。以喜闻乐见的RequestMappingHandlerAdapter为例，其初始化的HandlerMethodReturnValueHandler列表如下:
+
+- ModelAndViewMethodReturnValueHandler
+- ModelMethodProcessor
+- HttpEntityMethodProcessor
+- HttpHeadersReturnValueHandler
+- CallableMethodReturnValueHandler
+- DeferredResultMethodReturnValueHandler
+- AsyncTaskMethodReturnValueHandler
+- ListenableFutureReturnValueHandler
+- ModelAttributeMethodProcessor
+- RequestResponseBodyMethodProcessor
+- ViewNameMethodReturnValueHandler
+- MapMethodProcessor
+- ModelAndViewResolverMethodReturnValueHandler
+
+从中也可以推测出我们可以把哪些类型的值(对象)直接"丢给"Spring。

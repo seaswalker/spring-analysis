@@ -1090,3 +1090,5 @@ HandlerMethodReturnValueHandler接口以及主要实现类如下:
 - ModelAndViewResolverMethodReturnValueHandler
 
 从中也可以推测出我们可以把哪些类型的值(对象)直接"丢给"Spring。
+
+对于HandlerMethodArgumentResolver和HandlerMethodReturnValueHandler来说，HttpMessageConverter像是两者手中用来实现功能的武器。

@@ -753,7 +753,35 @@ protected ModelAndView handleInternal(HttpServletRequest request,
 
 解析由RequestParamMethodArgumentResolver完成。
 
-supportsParameter方法决定了一个解析器可以解析的参数类型，该解析器支持@RequestParam标准的参数或是**简单类型**的参数，具体参见其注释。
+supportsParameter方法决定了一个解析器可以解析的参数类型，该解析器支持@RequestParam标准的参数或是**简单类型**的参数，具体参见其注释。为什么此解析器可以同时解析@RequestParam注解和普通参数呢?玄机在于RequestMappingHandlerAdapter方法在初始化参数解析器时其实初始化了**两个RequestMappingHandlerAdapter对象**，getDefaultArgumentResolvers方法相关源码:
+
+```java
+private List<HandlerMethodArgumentResolver> getDefaultArgumentResolvers() {
+    resolvers.add(new RequestPartMethodArgumentResolver(getMessageConverters(), this.requestResponseBodyAdvice));
+    // Catch-all
+    resolvers.add(new RequestParamMethodArgumentResolver(getBeanFactory(), true));
+}
+```
+
+useDefaultResolution参数用于启动对常规类型参数的解析，这里的常规类型指的又是什么呢?
+
+实际上由BeanUtils.isSimpleProperty方法决定:
+
+```java
+public static boolean isSimpleProperty(Class<?> clazz) {
+    Assert.notNull(clazz, "Class must not be null");
+    return isSimpleValueType(clazz) || (clazz.isArray() && isSimpleValueType(clazz.getComponentType()));
+}
+
+public static boolean isSimpleValueType(Class<?> clazz) {
+    return (ClassUtils.isPrimitiveOrWrapper(clazz) || clazz.isEnum() ||
+            CharSequence.class.isAssignableFrom(clazz) ||
+            Number.class.isAssignableFrom(clazz) ||
+            Date.class.isAssignableFrom(clazz) ||
+            URI.class == clazz || URL.class == clazz ||
+            Locale.class == clazz || Class.class == clazz);
+}
+```
 
 忽略复杂的调用关系，最核心的实现位于resolveName方法，部分源码:
 
@@ -771,6 +799,73 @@ protected Object resolveName(String name, MethodParameter parameter, NativeWebRe
 ```
 
 name就是方法的参数名，可以看出，参数解析**就是根据参数名去request查找对应属性的过程**，在这里参数类型并没有起什么作用。
+
+###### 参数名是从哪里来的
+
+方法名获取的入口位于RequestParamMethodArgumentResolver的resolveArgument方法:
+
+```java
+@Override
+public final Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
+    NativeWebRequest webRequest, WebDataBinderFactory binderFactory) throws Exception {
+    NamedValueInfo namedValueInfo = getNamedValueInfo(parameter);
+}
+```
+
+getNamedValueInfo方法最终完成对MethodParameter的getParameterName方法的调用:
+
+```java
+public String getParameterName() {
+    ParameterNameDiscoverer discoverer = this.parameterNameDiscoverer;
+    if (discoverer != null) {
+        String[] parameterNames = (this.method != null ?
+                discoverer.getParameterNames(this.method) : discoverer.getParameterNames(this.constructor));
+        if (parameterNames != null) {
+            this.parameterName = parameterNames[this.parameterIndex];
+        }
+        this.parameterNameDiscoverer = null;
+    }
+    return this.parameterName;
+}
+```
+
+显然，参数名的获取由接口ParameterNameDiscoverer完成:
+
+![ParameterNameDiscoverer](images/ParameterNameDiscoverer.jpg)
+
+默认采用DefaultParameterNameDiscoverer，但此类其实相当于StandardReflectionParameterNameDiscoverer和LocalVariableTableParameterNameDiscoverer的组合，且前者先于后者进行解析。
+
+StandardReflectionParameterNameDiscoverer.getParameterNames:
+
+```java
+@Override
+public String[] getParameterNames(Method method) {
+    Parameter[] parameters = method.getParameters();
+    String[] parameterNames = new String[parameters.length];
+    for (int i = 0; i < parameters.length; i++) {
+        Parameter param = parameters[i];
+        if (!param.isNamePresent()) {
+            return null;
+        }
+        parameterNames[i] = param.getName();
+    }
+    return parameterNames;
+}
+```
+
+此类被注解UsesJava8标注，其原理就是利用的jdk8的-parameters编译参数，只有在加上此选项的情况下才能用反射的方法获得真实的参数名，所以一般情况下StandardReflectionParameterNameDiscoverer是无法成功获取参数名的。
+
+LocalVariableTableParameterNameDiscoverer利用了ASM直接访问class文件中的本地变量表来得到变量名，下面是使用`javap -verbose`命令得到的本地变量表示例:
+
+![本地变量表](images/local_variable_tables.PNG)
+
+但是默认情况下javac compiler是不生成本地变量表这种调试信息的，需要加`-g`参数才可以，那为什么在我们的测试Controller中却可以获得呢，玄机就在于idea的下列设置:
+
+![idea编译设置](images/idea_debug_info.PNG)
+
+取消这项设置的勾选再次运行程序便出问题了:
+
+![调试信息错误](images/debug_info_error.PNG)
 
 #### Model
 
@@ -803,7 +898,8 @@ public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer m
 
 #### 总结
 
-我们可以通过实现HandlerMethodArgumentResolver接口并将其注册容器的方式实现自定义参数类型的解析。
+- 我们可以通过实现HandlerMethodArgumentResolver接口并将其注册容器的方式实现自定义参数类型的解析。
+- 为了防止出现参数名获取不到的问题，应优先使用@RequestParam注解直接声明需要的参数名称。
 
 ### 返回值解析
 

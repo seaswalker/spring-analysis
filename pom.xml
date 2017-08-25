@@ -87,6 +87,13 @@
             <artifactId>mysql-connector-java</artifactId>
             <version>5.1.20</version>
         </dependency>
+
+        <dependency>
+            <groupId>cglib</groupId>
+            <artifactId>cglib</artifactId>
+            <version>3.2.5</version>
+        </dependency>
+
     </dependencies>
 
     <build>
@@ -95,6 +102,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
+                    <debug>false</debug>
                     <source>1.8</source>
                     <target>1.8</target>
                 </configuration>

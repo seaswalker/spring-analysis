@@ -14,23 +14,12 @@
         http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
         http://www.springframework.org/schema/task http://www.springframework.org/schema/task/spring-task-4.0.xsd">
 
-    <!-- 数据源以Sping自带为例，每次请求均返回一个新的连接 -->
-    <bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
-        <property name="driverClassName" value="com.mysql.jdbc.Driver" />
-        <property name="url" value="jdbc:mysql://localhost:3306/test" />
-        <property name="username" value="tiger" />
-        <property name="password" value="tiger" />
-    </bean>
+    <bean id="simpleMethodInterceptor" class="aop.SimpleMethodInterceptor" />
 
-    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
-        <property name="dataSource" ref="dataSource"/>
-    </bean>
+    <bean class="aop.SimpleAopBean" />
 
-    <bean id="nestedBean" class="base.transaction.NestedBean" />
-    <bean class="base.transaction.TransactionBean">
-        <property name="nestedBean" ref="nestedBean" />
-    </bean>
-
-    <tx:annotation-driven transaction-manager="transactionManager" mode="proxy"/>
+    <aop:config expose-proxy="true">
+        <aop:advisor advice-ref="simpleMethodInterceptor" pointcut="execution(* aop.SimpleAopBean.*(..))" />
+    </aop:config>
 
 </beans>

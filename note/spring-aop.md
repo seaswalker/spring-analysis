@@ -1146,3 +1146,59 @@ public boolean isAspect(Class<?> clazz) {
 ## 总结
 
 Spring对于AspectJ风格AOP的支持停留在外表(注解)上面，内部的实现仍然是自己的东西。
+
+# 拾遗
+
+## AOP切面的坑
+
+1. 定义在private方法上的切面不会被执行，这个很容易理解，毕竟子类不能覆盖父类的私有方法。
+2. 同一个代理子类内部的方法相互调用不会再次执行切面。
+
+这里以Cglib为例对第二点进行说明，cglib的相关核心组件可以参考前面CallbackFilter & Callback部分。对于配置了一个切面的典型场景，Spring内部的执行流程可总结如下图:
+
+![Cglib调用流程](images/cglib_invocation.png)
+
+核心便是对目标方法的调用上，这里由CglibMethodInvocation的invokeJoinpoint实现:
+
+```java
+@Override
+protected Object invokeJoinpoint() throws Throwable {
+    if (this.publicMethod) {
+        return this.methodProxy.invoke(this.target, this.arguments);
+    } else {
+        return super.invokeJoinpoint();
+    }
+}
+```
+
+如果是非public方法，那么Spring将使用反射的方法对其进行调用，因为反射将其可访问性设为true。MethodProxy是Cglib对方法代理的抽象，这里的关键是**方法调用的对象(目标)是我们的原生类对象，而不是Cglib代理子类的对象，这就从根本上决定了对同类方法的调用不会再次经过切面**。
+
+### 总结
+
+前面aop:aspectj-autoproxy-属性-expose-proxy一节提到了，Spring允许我们将代理子类暴露出来，可以进行如下配置:
+
+```xml
+<aop:config expose-proxy="true">
+    <aop:advisor advice-ref="simpleMethodInterceptor" pointcut="execution(* aop.SimpleAopBean.*(..))" />
+</aop:config>
+```
+
+当我们需要在一个被代理方法中调用同类的方法时(此方法也需要经过切面)，可以这样调用:
+
+```java
+public void testB() {
+    System.out.println("testB执行");
+    ((SimpleAopBean) AopContext.currentProxy()).testC();
+}
+```
+
+这里其实是一个ThreadLocal，当Cglib代理子类创建调用链之间便会将代理类设置到其中，DynamicAdvisedInterceptor.intercept相关源码:
+
+```java
+if (this.advised.exposeProxy) {
+    // Make invocation available if necessary.
+    oldProxy = AopContext.setCurrentProxy(proxy);
+    setProxyContext = true;
+}
+```
+

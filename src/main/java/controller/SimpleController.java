@@ -1,5 +1,6 @@
 package controller;
 
+import model.SimpleModel;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,6 +16,12 @@ public class SimpleController {
     @RequestMapping("/echo")
     public String echo(String name, Model model) {
         model.addAttribute("echo", "hello " + name);
+        return "echo";
+    }
+
+    @RequestMapping("/echoAgain")
+    public String echo(SimpleModel simpleModel, Model model) {
+        model.addAttribute("echo", "hello " + simpleModel.getName() + ", your age is " + simpleModel.getAge() + ".");
         return "echo";
     }
 

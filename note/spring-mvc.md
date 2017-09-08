@@ -1188,3 +1188,17 @@ HandlerMethodReturnValueHandler接口以及主要实现类如下:
 从中也可以推测出我们可以把哪些类型的值(对象)直接"丢给"Spring。
 
 对于HandlerMethodArgumentResolver和HandlerMethodReturnValueHandler来说，HttpMessageConverter像是两者手中用来实现功能的武器。
+
+## "纯"对象参数接收
+
+假设有如下这样的Controller:
+
+```java
+@RequestMapping("/echoAgain")
+public String echo(SimpleModel simpleModel, Model model) {
+    model.addAttribute("echo", "hello " + simpleModel.getName() + ", your age is " + simpleModel.getAge() + ".");
+    return "echo";
+}
+```
+
+经过测试可以发现，SimpleModel参数既可以接收get请求，也可以接收post请求。那么在这种情况下请求参数是被哪个参数解析器解析的呢，debug发现: ServletModelAttributeMethodProcessor

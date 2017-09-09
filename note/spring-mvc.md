@@ -1201,4 +1201,53 @@ public String echo(SimpleModel simpleModel, Model model) {
 }
 ```
 
-经过测试可以发现，SimpleModel参数既可以接收get请求，也可以接收post请求。那么在这种情况下请求参数是被哪个参数解析器解析的呢，debug发现: ServletModelAttributeMethodProcessor
+经过测试可以发现，SimpleModel参数既可以接收get请求，也可以接收post请求。那么在这种情况下请求参数是被哪个参数解析器解析的呢，debug发现: ServletModelAttributeMethodProcessor：
+
+![ServletModelAttributeMethodProcessor](images/ServletModelAttributeMethodProcessor.jpg)
+
+核心的supportsParameter方法由父类ModelAttributeMethodProcessor实现:
+
+```java
+@Override
+public boolean supportsParameter(MethodParameter parameter) {
+    return (parameter.hasParameterAnnotation(ModelAttribute.class) ||
+        (this.annotationNotRequired && !BeanUtils.isSimpleProperty(parameter.getParameterType())));
+}
+```
+
+可以看出，这里支持带有ModelAttribute注解或者是非基本类型的参数解析，同时annotationNotRequired必须设为false，即ModelAttribute注解不必存在，这里是在ServletModelAttributeMethodProcessor的构造器中进行控制的，
+RequestMappingHandlerAdapter.getDefaultArgumentResolvers部分源码:
+
+```java
+resolvers.add(new ServletModelAttributeMethodProcessor(false));
+```
+
+此类的作用是对@ModelAttribute注解标注的参数进行解析，假设我们将Controller方法改写成:
+
+```java
+@RequestMapping("/echoAgain")
+public String echo(@ModelAttribute SimpleModel simpleModel, Model model) {
+    model.addAttribute("echo", "hello " + simpleModel.getName() + ", your age is " + simpleModel.getAge() + ".");
+    System.out.println(model.asMap().get("simpleModel"));
+    return "echo";
+}
+```
+
+首先，Spring会首先反射生成一个SimpleModel对象，之后将从request中获取的参数尝试设置到SimpleModel对象中去，最后将此对象放置到Model中(本质上就是一个Map)，key就是simpleModel.下面我们来看一下具体的解析过程，整个过程可以分为
+以下三部分:
+
+### 参数对象构造
+
+因为SimpleModel是一个对象类型，所以要想将参数注入到其中，第一步必然是先创建一个对象，创建的入口位于ModelAttributeMethodProcessor的resolveArgument方法，相关源码:
+
+```java
+//name在这里便是simpleModel
+String name = ModelFactory.getNameForParameter(parameter);
+Object attribute = (mavContainer.containsAttribute(name) ? mavContainer.getModel().get(name) :
+                    createAttribute(name, parameter, binderFactory, webRequest));//反射实例化
+```
+
+ModelAndViewContainer是个什么东西呢，从名字就可以看出就，它是Spring MVC里两个重要概念Model和View的组合体，用来记录在请求响应过程中Model和View的变化，在这里可以简单理解为去Model中检查有没有叫simpleModel的属性已经存在。
+
+### 参数绑定
+

@@ -26,4 +26,12 @@ public class SimpleModel {
         this.age = age;
     }
 
+    @Override
+    public String toString() {
+        return "SimpleModel{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                '}';
+    }
+
 }

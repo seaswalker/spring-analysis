@@ -1251,3 +1251,19 @@ ModelAndViewContainer是个什么东西呢，从名字就可以看出就，它�
 
 ### 参数绑定
 
+这里使用到了DataBinder接口，按照注释的说明，此接口用以**向执行的对象中设置属性值**，就是这么简单，其继承体系如下图:
+
+![DataBinder](images/DataBinder.jpg)
+
+WebDataBinderFactory接口用以创建WebDataBinder对象，其继承体系如下图:
+
+![WebDataBinderFactory](images/WebDataBinderFactory.jpg)
+
+默认使用的是ServletRequestDataBinderFactory，创建了一个ExtendedServletRequestDataBinder对象:
+
+```java
+@Override
+protected ServletRequestDataBinder createBinderInstance(Object target, String objectName, NativeWebRequest request) {
+    return new ExtendedServletRequestDataBinder(target, objectName);
+}
+```

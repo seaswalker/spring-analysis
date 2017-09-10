@@ -1267,3 +1267,129 @@ protected ServletRequestDataBinder createBinderInstance(Object target, String ob
     return new ExtendedServletRequestDataBinder(target, objectName);
 }
 ```
+
+参数绑定的入口位于ModelAttributeMethodProcessor.resolveArgument方法，相关源码:
+
+```java
+if (!mavContainer.isBindingDisabled(name)) {
+    bindRequestParameters(binder, webRequest);
+}
+```
+
+接下来由ServletRequestDataBinder的bind方法完成，核心源码:
+
+```java
+public void bind(ServletRequest request) {
+    MutablePropertyValues mpvs = new ServletRequestParameterPropertyValues(request);
+    doBind(mpvs);
+}
+```
+
+在ServletRequestParameterPropertyValues构造器中获取了Request中所有的属性对。doBind方法便是调用前面初始化的目标对象的setter方法进行参数设置的过程，不再展开。
+
+### 参数校验
+
+将我们的Controller方法改写为下面这种形式便可以启动Spring MVC的参数校验:
+
+```java
+@RequestMapping("/echoAgain")
+public String echo(@Validated SimpleModel simpleModel, Model model) {
+    model.addAttribute("echo", "hello " + simpleModel.getName() + ", your age is " + simpleModel.getAge() + ".");
+    System.out.println(model.asMap().get("simpleModel"));
+    return "echo";
+}
+```
+
+在这里@Validated注解可以用@Valid(javax)替换，前者是Spring对java校验标准的扩充，增加了校验组的支持。
+为什么参数校验要放到参数绑定后面进行说明呢，因为**@Validated和@valid注解不会影响Spring MVC参数解析的行为，被这两个注解标注的对象仍是由参数绑定一节提到的解析器进行解析。**
+
+当参数校验绑定之后，Spring MVC会尝试对参数进行校验，如果我们设置了校验注解。ModelAttributeMethodProcessor.resolveArgument方法相关源码:
+
+```java
+validateIfApplicable(binder, parameter);
+
+protected void validateIfApplicable(WebDataBinder binder, MethodParameter methodParam) {
+    Annotation[] annotations = methodParam.getParameterAnnotations();
+    for (Annotation ann : annotations) {
+        Validated validatedAnn = AnnotationUtils.getAnnotation(ann, Validated.class);
+        if (validatedAnn != null || ann.annotationType().getSimpleName().startsWith("Valid")) {
+            Object hints = (validatedAnn != null ? validatedAnn.value() : AnnotationUtils.getValue(ann));
+            Object[] validationHints = (hints instanceof Object[] ? (Object[]) hints : new Object[] {hints});
+            binder.validate(validationHints);
+            break;
+        }
+    }
+}
+```
+
+DataBinder.validate:
+
+```java
+public void validate(Object... validationHints) {
+    for (Validator validator : getValidators()) {
+        if (!ObjectUtils.isEmpty(validationHints) && validator instanceof SmartValidator) {
+            ((SmartValidator) validator).validate(getTarget(), getBindingResult(), validationHints);
+        } else if (validator != null) {
+            validator.validate(getTarget(), getBindingResult());
+        }
+    }
+}
+```
+
+可见，具体的校验交给了`org.springframework.validation.Validator`实现，类图:
+
+![Validator](images/Validator.png)
+
+getValidators方法获取的实际上是DataBinder内部的validators字段:
+
+```java
+private final List<Validator> validators = new ArrayList<Validator>();
+```
+
+根据这里的校验器的来源可以分为以下两种情况。
+
+#### JSR校验
+
+需要引入hibernate-validator到classpath中，回顾最前面配置解析部分，配置:
+
+```xml
+<mvc:annotation-driven/>
+```
+
+会利用AnnotationDrivenBeanDefinitionParser进行相关的解析、初始化工作，正是在其parse方法完成了对JSR校验的支持。相关源码:
+
+```java
+@Override
+public BeanDefinition parse(Element element, ParserContext parserContext) {
+    RuntimeBeanReference validator = getValidator(element, source, parserContext);
+}
+
+private RuntimeBeanReference getValidator(Element element, Object source, ParserContext parserContext) {
+    //mvc:annotation-driven配置支持validator属性
+    if (element.hasAttribute("validator")) {
+        return new RuntimeBeanReference(element.getAttribute("validator"));
+    } else if (javaxValidationPresent) {
+        RootBeanDefinition validatorDef = new RootBeanDefinition(
+                "org.springframework.validation.beanvalidation.OptionalValidatorFactoryBean");
+        validatorDef.setSource(source);
+        validatorDef.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
+        String validatorName = parserContext.getReaderContext().registerWithGeneratedName(validatorDef);
+        parserContext.registerComponent(new BeanComponentDefinition(validatorDef, validatorName));
+        return new RuntimeBeanReference(validatorName);
+    } else {
+        return null;
+    }
+}
+```
+
+javaxValidationPresent的定义:
+
+```java
+private static final boolean javaxValidationPresent =
+    ClassUtils.isPresent("javax.validation.Validator", AnnotationDrivenBeanDefinitionParser.class.getClassLoader());
+```
+
+OptionalValidatorFactoryBean实现了InitializingBean接口，所以afterPropertiesSet方法是其初始化的入口，具体的校验过程不再展开。
+
+#### 自定义校验器
+

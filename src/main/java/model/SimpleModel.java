@@ -1,7 +1,5 @@
 package model;
 
-import javax.validation.constraints.NotBlank;
-
 /**
  * 简单的model.
  *
@@ -9,7 +7,6 @@ import javax.validation.constraints.NotBlank;
  */
 public class SimpleModel {
 
-    @NotBlank
     private String name;
     private Integer age;
 

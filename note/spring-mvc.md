@@ -1389,7 +1389,49 @@ private static final boolean javaxValidationPresent =
     ClassUtils.isPresent("javax.validation.Validator", AnnotationDrivenBeanDefinitionParser.class.getClassLoader());
 ```
 
-OptionalValidatorFactoryBean实现了InitializingBean接口，所以afterPropertiesSet方法是其初始化的入口，具体的校验过程不再展开。
+ 实现了InitializingBean接口，所以afterPropertiesSet方法是其初始化的入口，具体的校验过程不再展开。
+ 除此之外还有一个有意思的问题，就是上面提到的校验器是如何进入到DataBinder中去的呢?答案是WebDataBinderFactory创建DataBinder对象时会利用WebBindingInitializer对DataBinder进行初始化，正是在这里
+ 将容器中存在的校验器设置到DataBinder中，至于WebBindingInitializer又是从哪里来的，不再探究了，否则这细节实在是太麻烦了，意义不大。
 
 #### 自定义校验器
 
+我们可以实现Spring提供的Validator接口，然后在Controller里边这样设置我们要是用的校验器:
+
+```java
+@InitBinder
+public void initBinder(DataBinder dataBinder) {
+    dataBinder.setValidator(new SimpleModelValidator());
+    //如果有多个可以使用setValidators方法
+}
+```
+
+我们的Controller方法依然可以如此定义:
+
+```java
+@RequestMapping("/echoAgain")
+public String echo(@Validated SimpleModel simpleModel, Model model) {
+    return "echo";
+}
+```
+
+如果有错误，会直接返回400.
+
+#### 一个有意思的问题
+
+如果我们把Controller方法这样定义会怎样?
+
+```java
+@RequestMapping(value = "/echoAgain", method = RequestMethod.POST)
+public String echo(@Validated @RequestBody SimpleModel simpleModel, Model model) {}
+```
+
+答案是@RequestBody注解根本就没有起作用?why?
+
+RequestMappingHandlerAdapter.getDefaultArgumentResolvers相关源码:
+
+```java
+resolvers.add(new ServletModelAttributeMethodProcessor(false));
+resolvers.add(new RequestResponseBodyMethodProcessor(getMessageConverters(), this.requestResponseBodyAdvice));
+```
+
+仅仅就是因为ServletModelAttributeMethodProcessor的声明比RequestResponseBodyMethodProcessor早了一行!

@@ -1401,7 +1401,7 @@ private static final boolean javaxValidationPresent =
 @InitBinder
 public void initBinder(DataBinder dataBinder) {
     dataBinder.setValidator(new SimpleModelValidator());
-    //如果有多个可以使用setValidators方法
+    //如果有多个可以使用addValidators方法
 }
 ```
 

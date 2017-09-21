@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<XPD:PROJECT xmlns:XPD="http://www.staruml.com" version="1">
+<XPD:HEADER>
+<XPD:SUBUNITS>
+</XPD:SUBUNITS>
+<XPD:PROFILES>
+</XPD:PROFILES>
+</XPD:HEADER>
+<XPD:BODY>
+<XPD:OBJ name="DocumentElement" type="UMLProject" guid="qZA94hFdS0SLO4Ma0W4NXAAA">
+<XPD:ATTR name="Title" type="string">spring-boot</XPD:ATTR>
+<XPD:ATTR name="#OwnedElements" type="integer">1</XPD:ATTR>
+<XPD:OBJ name="OwnedElements[0]" type="UMLModel" guid="69VGSXSIBUW7p8ufeBl/9gAA">
+<XPD:ATTR name="Name" type="string">classes</XPD:ATTR>
+<XPD:REF name="Namespace">qZA94hFdS0SLO4Ma0W4NXAAA</XPD:REF>
+<XPD:ATTR name="#OwnedDiagrams" type="integer">1</XPD:ATTR>
+<XPD:OBJ name="OwnedDiagrams[0]" type="UMLClassDiagram" guid="/njh2Q/xeUGIf6Vw8nEdJAAA">
+<XPD:ATTR name="Name" type="string">SpringApplicationRunListener</XPD:ATTR>
+<XPD:REF name="DiagramOwner">69VGSXSIBUW7p8ufeBl/9gAA</XPD:REF>
+<XPD:OBJ name="DiagramView" type="UMLClassDiagramView" guid="w7/jtpf8f0KdkSjasT77/QAA">
+<XPD:REF name="Diagram">/njh2Q/xeUGIf6Vw8nEdJAAA</XPD:REF>
+<XPD:ATTR name="#OwnedViews" type="integer">1</XPD:ATTR>
+<XPD:OBJ name="OwnedViews[0]" type="UMLInterfaceView" guid="7pos0T+U7062k2pRb9krYQAA">
+<XPD:ATTR name="LineColor" type="string">clMaroon</XPD:ATTR>
+<XPD:ATTR name="FillColor" type="string">$00B9FFFF</XPD:ATTR>
+<XPD:ATTR name="Left" type="integer">508</XPD:ATTR>
+<XPD:ATTR name="Top" type="integer">96</XPD:ATTR>
+<XPD:ATTR name="Width" type="integer">177</XPD:ATTR>
+<XPD:ATTR name="Height" type="integer">59</XPD:ATTR>
+<XPD:ATTR name="StereotypeDisplay" type="UMLStereotypeDisplayKind">sdkNone</XPD:ATTR>
+<XPD:REF name="Model">4NdjgA17bE2i/3g5wzvqpwAA</XPD:REF>
+<XPD:OBJ name="NameCompartment" type="UMLNameCompartmentView" guid="q4Ex3Y0CGEGutNioIj9/4gAA">
+<XPD:OBJ name="NameLabel" type="LabelView" guid="50H6+W+NUki+6L7QBAetCAAA">
+<XPD:ATTR name="FontStyle" type="integer">1</XPD:ATTR>
+<XPD:ATTR name="Text" type="string">SpringApplicationRunListener</XPD:ATTR>
+</XPD:OBJ>
+<XPD:OBJ name="StereotypeLabel" type="LabelView" guid="mZdGdjtTg0i5nsjISADPKAAA">
+<XPD:ATTR name="Text" type="string">&lt;&lt;interface&gt;&gt;</XPD:ATTR>
+</XPD:OBJ>
+<XPD:OBJ name="PropertyLabel" type="LabelView" guid="mH1WY+FMRkyiQogTMHXRIwAA">
+<XPD:ATTR name="Visible" type="boolean">False</XPD:ATTR>
+</XPD:OBJ>
+</XPD:OBJ>
+<XPD:OBJ name="AttributeCompartment" type="UMLAttributeCompartmentView" guid="vZkbhaFErUiZYOVv+9sHpwAA">
+<XPD:ATTR name="Visible" type="boolean">False</XPD:ATTR>
+<XPD:REF name="Model">4NdjgA17bE2i/3g5wzvqpwAA</XPD:REF>
+</XPD:OBJ>
+<XPD:OBJ name="OperationCompartment" type="UMLOperationCompartmentView" guid="030TeKKn3EuzD7i4zkelCQAA">
+<XPD:REF name="Model">4NdjgA17bE2i/3g5wzvqpwAA</XPD:REF>
+</XPD:OBJ>
+</XPD:OBJ>
+</XPD:OBJ>
+</XPD:OBJ>
+<XPD:ATTR name="#OwnedElements" type="integer">1</XPD:ATTR>
+<XPD:OBJ name="OwnedElements[0]" type="UMLInterface" guid="4NdjgA17bE2i/3g5wzvqpwAA">
+<XPD:ATTR name="Name" type="string">SpringApplicationRunListener</XPD:ATTR>
+<XPD:REF name="Namespace">69VGSXSIBUW7p8ufeBl/9gAA</XPD:REF>
+<XPD:ATTR name="#Views" type="integer">3</XPD:ATTR>
+<XPD:REF name="Views[0]">7pos0T+U7062k2pRb9krYQAA</XPD:REF>
+<XPD:REF name="Views[1]">vZkbhaFErUiZYOVv+9sHpwAA</XPD:REF>
+<XPD:REF name="Views[2]">030TeKKn3EuzD7i4zkelCQAA</XPD:REF>
+<XPD:ATTR name="#Operations" type="integer">1</XPD:ATTR>
+<XPD:OBJ name="Operations[0]" type="UMLOperation" guid="LTR5CECZ1EWPSys1R3dcPwAA">
+<XPD:ATTR name="Name" type="string">void starting</XPD:ATTR>
+<XPD:REF name="Owner">4NdjgA17bE2i/3g5wzvqpwAA</XPD:REF>
+</XPD:OBJ>
+</XPD:OBJ>
+</XPD:OBJ>
+</XPD:OBJ>
+</XPD:BODY>
+</XPD:PROJECT>

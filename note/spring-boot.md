@@ -67,6 +67,24 @@ deduceWebEnvironment方法用于检测当前是否是web工程环境，检测的
 
 ![SpringApplication.run](images/spring_application_run.png)
 
+## starting
+
+SpringApplicationRunListener其实起一个广播器的作用，将消息广播给ApplicationListener一节初始化的10个Listener中的某几个。
+
+debug可以发现，对启动事件感兴趣的只有LoggingApplicationListener一个。
+
+ 当LoggingApplicationListener监听到启动事件时，所作的主要工作便是决定采用哪一个日志框架，其判断逻辑如下:
+
+- 如果系统变量`org.springframework.boot.logging.LoggingSystem`存在，那么由其决定。
+
+- 依次检测classpath中这些类是否存在:
+
+  ```java
+  ch.qos.logback.core.Appender;
+  org.apache.logging.log4j.core.impl.Log4jContextFactory;
+  java.util.logging.LogManager;
+  ```
+
 ## 环境准备
 
 相关源码:
@@ -105,4 +123,55 @@ protected void configureProfiles(ConfigurableEnvironment environment, String[] a
 ```
 
 active profile取自上一节中的属性来源，key为`spring.profiles.active`.
+
+## environmentPrepared
+
+### 配置文件加载
+
+监听器ConfigFileApplicationListener负责spring-boot配置文件的加载，ConfigFileApplicationListener默认会从以下的位置搜索配置文件:
+
+1. classpath下的application.properties或application.yml
+2. file:./下的application.properties或application.yml
+3. classpath:config目录下的application.properties或application.yml
+4. file:./config目录下的application.properties或application.yml
+
+此监听器是如何加载的?源码:
+
+```java
+private void onApplicationEnvironmentPreparedEvent(ApplicationEnvironmentPreparedEvent event) {
+	List<EnvironmentPostProcessor> postProcessors = loadPostProcessors();
+	postProcessors.add(this);
+	AnnotationAwareOrderComparator.sort(postProcessors);
+	for (EnvironmentPostProcessor postProcessor : postProcessors) {
+		postProcessor.postProcessEnvironment(event.getEnvironment(),
+				event.getSpringApplication());
+	}
+}
+```
+
+显然核心的加载操作是通过EnvironmentPostProcessor接口实现的，此接口允许我们在context刷新之前自定义配置加载，并且Spring推荐此接口的实现类同时实现Ordered接口。类图:
+
+![EnvironmentPostProcessor](images/EnvironmentPostProcessor.png)
+
+加上ConfigFileApplicationListener自己，spring-boot默认共初始化了三个加载器，其它两个是SpringApplicationJsonEnvironmentPostProcessor和CloudFoundryVcapEnvironmentPostProcessor，下面按照其优先级顺序进行说明。
+
+#### SpringApplicationJsonEnvironmentPostProcessor
+
+尝试读取spring.application.json或SPRING_APPLICATION_JSON系统指定的json配置文件，从这里加载的配置具有最高的优先级，当然，默认是没有的。
+
+#### CloudFoundryVcapEnvironmentPostProcessor
+
+从Cloud Foundry加载配置，这是什么东西问度娘。
+
+#### ConfigFileApplicationListener
+
+这里就是加载配置文件加载一节所说的配置文件的过程。
+
+
+
+TODO: 多profile配置文件加载
+
+
+
+
 

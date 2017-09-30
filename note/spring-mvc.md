@@ -1425,8 +1425,7 @@ public String echo(@Validated SimpleModel simpleModel, Model model) {
 public String echo(@Validated @RequestBody SimpleModel simpleModel, Model model) {}
 ```
 
-答案是@RequestBody注解根本就没有起作用?why?
-
+答案是@RequestBody注解先于@Validated注解起作用，这样既可以利用@RequestBody注解向Controller传递json串，同时又能够达到校验的目的。从源码的角度来说，这在很大程度上是一个顺序的问题:
 RequestMappingHandlerAdapter.getDefaultArgumentResolvers相关源码:
 
 ```java
@@ -1434,4 +1433,11 @@ resolvers.add(new ServletModelAttributeMethodProcessor(false));
 resolvers.add(new RequestResponseBodyMethodProcessor(getMessageConverters(), this.requestResponseBodyAdvice));
 ```
 
-仅仅就是因为ServletModelAttributeMethodProcessor的声明比RequestResponseBodyMethodProcessor早了一行!
+虽然ServletModelAttributeMethodProcessor位于RequestResponseBodyMethodProcessor之前，但构造器参数为false说明了此解析器必须要求参数被@ModelAttribute注解标注，其实在最后还有一个不需要注解的解析器被添加:
+
+```java
+// Catch-all
+resolvers.add(new ServletModelAttributeMethodProcessor(true));
+```
+
+至此，真相大白。

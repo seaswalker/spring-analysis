@@ -1,3 +1,27 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [开头](#%E5%BC%80%E5%A4%B4)
+- [定时器](#%E5%AE%9A%E6%97%B6%E5%99%A8)
+  - [用法](#%E7%94%A8%E6%B3%95)
+  - [解析](#%E8%A7%A3%E6%9E%90)
+    - [注册](#%E6%B3%A8%E5%86%8C)
+    - [scheduler](#scheduler)
+    - [scheduled-tasks](#scheduled-tasks)
+  - [调度执行](#%E8%B0%83%E5%BA%A6%E6%89%A7%E8%A1%8C)
+    - [scheduler初始化](#scheduler%E5%88%9D%E5%A7%8B%E5%8C%96)
+    - [任务调度](#%E4%BB%BB%E5%8A%A1%E8%B0%83%E5%BA%A6)
+      - [Trigger](#trigger)
+      - [Cron解析](#cron%E8%A7%A3%E6%9E%90)
+      - [调度](#%E8%B0%83%E5%BA%A6)
+  - [总结](#%E6%80%BB%E7%BB%93)
+- [异步执行](#%E5%BC%82%E6%AD%A5%E6%89%A7%E8%A1%8C)
+  - [配置](#%E9%85%8D%E7%BD%AE)
+  - [原理](#%E5%8E%9F%E7%90%86)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # 开头
 
 从功能上来说，spring-task这个组件主要包括了两个/两种功能:

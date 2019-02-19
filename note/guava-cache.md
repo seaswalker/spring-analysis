@@ -1,3 +1,37 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [创建](#%E5%88%9B%E5%BB%BA)
+  - [数据结构](#%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84)
+    - [segments](#segments)
+    - [ReferenceEntry](#referenceentry)
+  - [初始化](#%E5%88%9D%E5%A7%8B%E5%8C%96)
+    - [ReferenceEntry数组](#referenceentry%E6%95%B0%E7%BB%84)
+    - [引用队列](#%E5%BC%95%E7%94%A8%E9%98%9F%E5%88%97)
+- [put](#put)
+  - [Hash算法](#hash%E7%AE%97%E6%B3%95)
+  - [ReHash](#rehash)
+  - [Segment选取](#segment%E9%80%89%E5%8F%96)
+  - [Segment.put](#segmentput)
+    - [线程安全性](#%E7%BA%BF%E7%A8%8B%E5%AE%89%E5%85%A8%E6%80%A7)
+    - [过期/垃圾缓存清理](#%E8%BF%87%E6%9C%9F%E5%9E%83%E5%9C%BE%E7%BC%93%E5%AD%98%E6%B8%85%E7%90%86)
+      - [垃圾缓存](#%E5%9E%83%E5%9C%BE%E7%BC%93%E5%AD%98)
+        - [善后](#%E5%96%84%E5%90%8E)
+        - [writeQueue移除](#writequeue%E7%A7%BB%E9%99%A4)
+        - [accessQueue移除](#accessqueue%E7%A7%BB%E9%99%A4)
+        - [加载终止](#%E5%8A%A0%E8%BD%BD%E7%BB%88%E6%AD%A2)
+        - [移除算法](#%E7%A7%BB%E9%99%A4%E7%AE%97%E6%B3%95)
+      - [过期缓存](#%E8%BF%87%E6%9C%9F%E7%BC%93%E5%AD%98)
+    - [扩容](#%E6%89%A9%E5%AE%B9)
+    - [设值](#%E8%AE%BE%E5%80%BC)
+- [get(key)](#getkey)
+  - [get(key,hash,loader)](#getkeyhashloader)
+- [参考](#%E5%8F%82%E8%80%83)
+- [总结](#%E6%80%BB%E7%BB%93)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # 创建
 
 以CacheLoader的方式为例:

@@ -1,3 +1,25 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [SpringApplication](#springapplication)
+  - [web环境检测](#web%E7%8E%AF%E5%A2%83%E6%A3%80%E6%B5%8B)
+  - [ApplicationContextInitializer](#applicationcontextinitializer)
+  - [ApplicationListener](#applicationlistener)
+  - [SpringApplicationRunListener](#springapplicationrunlistener)
+- [run](#run)
+  - [starting](#starting)
+  - [环境准备](#%E7%8E%AF%E5%A2%83%E5%87%86%E5%A4%87)
+    - [属性来源](#%E5%B1%9E%E6%80%A7%E6%9D%A5%E6%BA%90)
+    - [profile配置](#profile%E9%85%8D%E7%BD%AE)
+  - [environmentPrepared](#environmentprepared)
+    - [配置文件加载](#%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6%E5%8A%A0%E8%BD%BD)
+      - [SpringApplicationJsonEnvironmentPostProcessor](#springapplicationjsonenvironmentpostprocessor)
+      - [CloudFoundryVcapEnvironmentPostProcessor](#cloudfoundryvcapenvironmentpostprocessor)
+      - [ConfigFileApplicationListener](#configfileapplicationlistener)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # SpringApplication
 
 启动程序首先初始化了一个SpringApplication对象。来看一看在它的构造器了发生了什么。

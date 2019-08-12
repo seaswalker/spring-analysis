@@ -1,3 +1,37 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [配置](#%E9%85%8D%E7%BD%AE)
+- [解析](#%E8%A7%A3%E6%9E%90)
+  - [TransactionalEventListener](#transactionaleventlistener)
+  - [主要组件注册](#%E4%B8%BB%E8%A6%81%E7%BB%84%E4%BB%B6%E6%B3%A8%E5%86%8C)
+  - [代理类生成](#%E4%BB%A3%E7%90%86%E7%B1%BB%E7%94%9F%E6%88%90)
+    - [Advisor寻找](#advisor%E5%AF%BB%E6%89%BE)
+- [运行](#%E8%BF%90%E8%A1%8C)
+  - [调用链生成](#%E8%B0%83%E7%94%A8%E9%93%BE%E7%94%9F%E6%88%90)
+  - [调用链调用](#%E8%B0%83%E7%94%A8%E9%93%BE%E8%B0%83%E7%94%A8)
+  - [TransactionInterceptor](#transactioninterceptor)
+    - [事务管理器](#%E4%BA%8B%E5%8A%A1%E7%AE%A1%E7%90%86%E5%99%A8)
+    - [DataSource](#datasource)
+    - [事务开启](#%E4%BA%8B%E5%8A%A1%E5%BC%80%E5%90%AF)
+      - [是否已存在事务](#%E6%98%AF%E5%90%A6%E5%B7%B2%E5%AD%98%E5%9C%A8%E4%BA%8B%E5%8A%A1)
+      - [事务已存在](#%E4%BA%8B%E5%8A%A1%E5%B7%B2%E5%AD%98%E5%9C%A8)
+        - [PROPAGATION_NEVER](#propagation_never)
+        - [PROPAGATION_NOT_SUPPORTED](#propagation_not_supported)
+          - [事务挂起](#%E4%BA%8B%E5%8A%A1%E6%8C%82%E8%B5%B7)
+        - [PROPAGATION_REQUIRES_NEW](#propagation_requires_new)
+        - [PROPAGATION_NESTED](#propagation_nested)
+          - [debug环境搭建](#debug%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA)
+          - [事务对象](#%E4%BA%8B%E5%8A%A1%E5%AF%B9%E8%B1%A1)
+          - [Savepoint](#savepoint)
+        - [其它](#%E5%85%B6%E5%AE%83)
+      - [事务创建](#%E4%BA%8B%E5%8A%A1%E5%88%9B%E5%BB%BA)
+    - [事务提交 & 回滚](#%E4%BA%8B%E5%8A%A1%E6%8F%90%E4%BA%A4--%E5%9B%9E%E6%BB%9A)
+- [总结](#%E6%80%BB%E7%BB%93)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # 配置
 
 以最简单的jdbc事务为例:

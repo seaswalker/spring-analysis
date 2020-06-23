@@ -570,7 +570,7 @@ private static final Callback[] CALLBACKS = new Callback[] {
 
 ##### 入口
 
-其中前者首先被调用，时机是当BeanDefinition被合并(和父Bean)，但是还没有用来创建Bean实例时。回顾下其调用入口:
+其中前者首先被调用，时机是已创建Bean实例但还没有对实例执行初始化操作。回顾下其调用入口:
 
 AbstractAutowireCapableBeanFactory.doCreateBean(简略):
 

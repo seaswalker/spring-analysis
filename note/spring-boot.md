@@ -71,7 +71,7 @@ deduceWebEnvironment方法用于检测当前是否是web工程环境，检测的
 
 这货是典型的观察者模式实现，类图:
 
-![ApplicationListener](images/ApplicationListener.PNG)
+![ApplicationListener](images/ApplicationListener.png)
 
 在简单的web应用场景下，系统共初始化了这些监听器:
 

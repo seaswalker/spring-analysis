@@ -220,11 +220,11 @@ protected ConfigurableEnvironment createEnvironment() {
 
 ![Environment继承体系](images/Environment.jpg)
 
-Environmen接口**代表了当前应用所处的环境。**从此接口的方法可以看出，其主要和profile、Property相关。
+Environmen接口**代表了当前应用所处的环境。** 从此接口的方法可以看出，其主要和profile、Property相关。
 
 ##### Profile
 
-Spring Profile特性是从3.1开始的，其主要是为了解决这样一种问题: 线上环境和测试环境使用不同的配置或是数据库或是其它。有了Profile便可以在 不同环境之间无缝切换。**Spring容器管理的所有bean都是和一个profile绑定在一起的。**使用了Profile的配置文件示例:
+Spring Profile特性是从3.1开始的，其主要是为了解决这样一种问题: 线上环境和测试环境使用不同的配置或是数据库或是其它。有了Profile便可以在 不同环境之间无缝切换。**Spring容器管理的所有bean都是和一个profile绑定在一起的。** 使用了Profile的配置文件示例:
 
 ```xml
 <beans profile="develop">  
